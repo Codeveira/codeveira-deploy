@@ -1,0 +1,118 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: codereview
+      POSTGRES_USER: codereview
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codereview"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    image: ghcr.io/codeveira/codeveira:${IMAGE_TAG:-latest}
+    pull_policy: always
+    ports:
+      - "3000:3000"
+    environment:
+      RAILS_ENV: production
+      RAILS_LOG_TO_STDOUT: "true"
+      RAILS_SERVE_STATIC_FILES: "true"
+      DATABASE_URL: postgresql://codereview:${DB_PASSWORD:-secret}@db/codereview
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      APP_HOST: ${APP_HOST}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme123}
+      GITLAB_URL: ${GITLAB_URL}
+      GITLAB_APP_ID: ${GITLAB_APP_ID}
+      GITLAB_APP_SECRET: ${GITLAB_APP_SECRET}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_APP_ID: ${GITHUB_APP_ID}
+      GITHUB_APP_SECRET: ${GITHUB_APP_SECRET}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET}
+      GITEA_URL: ${GITEA_URL}
+      GITEA_WEBHOOK_SECRET: ${GITEA_WEBHOOK_SECRET}
+      BITBUCKET_WEBHOOK_SECRET: ${BITBUCKET_WEBHOOK_SECRET}
+      BITBUCKET_SERVER_WEBHOOK_SECRET: ${BITBUCKET_SERVER_WEBHOOK_SECRET}
+      LDAP_HOST: ${LDAP_HOST}
+      LDAP_PORT: ${LDAP_PORT:-389}
+      LDAP_SSL: ${LDAP_SSL:-false}
+      LDAP_BASE: ${LDAP_BASE}
+      LDAP_BIND_DN: ${LDAP_BIND_DN}
+      LDAP_PASSWORD: ${LDAP_PASSWORD}
+      LDAP_DOMAIN: ${LDAP_DOMAIN}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - app_storage:/app/storage
+      - backup_data:/backups
+    restart: unless-stopped
+
+  sidekiq:
+    image: ghcr.io/codeveira/codeveira:${IMAGE_TAG:-latest}
+    pull_policy: always
+    command: bundle exec sidekiq -C config/sidekiq.yml
+    environment:
+      RAILS_ENV: production
+      DATABASE_URL: postgresql://codereview:${DB_PASSWORD:-secret}@db/codereview
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      APP_HOST: ${APP_HOST}
+      GITLAB_URL: ${GITLAB_URL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - backup_data:/backups
+    restart: unless-stopped
+
+  lsp:
+    image: ghcr.io/codeveira/codeveira-lsp:${IMAGE_TAG:-latest}
+    pull_policy: always
+    ports:
+      - "${LSP_PORT:-7777}:7777"
+    environment:
+      CODEVEIRA_URL: http://app:3000
+      LSP_PORT: 7777
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  redis_data:
+  app_storage:
+  backup_data:
