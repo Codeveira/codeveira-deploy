@@ -4,6 +4,9 @@ All notable changes to Codeveira are documented here.
 
 ## [Unreleased]
 
+### Added
+- Two-factor authentication (TOTP) — admin global enforcement toggle in Settings → Users; per-user setup from Profile; green 2FA badge on user list; Standard+ feature
+
 ## [1.0.0] — 2026-07-06
 
 ### Added

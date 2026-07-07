@@ -58,6 +58,10 @@ Codeveira is **free for up to 3 users** — no license key required. Larger team
 
 To purchase a license or ask about Custom pricing: **hello@codeveira.com**
 
+## Two-Factor Authentication
+
+2FA is available on **Standard and higher** tiers. Admins can enforce it globally from **Settings → Users** — users without 2FA configured will be prompted to set it up after login and cannot bypass it. Users can also enable 2FA voluntarily from their **Profile** page.
+
 ## Documentation
 
 Full documentation at **[codeveira.com/docs](https://codeveira.com/docs/)**.
