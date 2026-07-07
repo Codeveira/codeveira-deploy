@@ -20,3 +20,6 @@ All notable changes to Codeveira are documented here.
 - Upsource migration import wizard
 - 4 colour themes (Light, Dark, Dracula, Nord)
 - LDAP / Active Directory authentication
+- License system — Free / Standard / Extended / Enterprise / Custom tiers with RSA-signed JWT keys, offline verification, pricing calculator
+- Stale CR badge and automatic tagging for inactive reviews
+- Dashboard filters (time range, label)

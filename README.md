@@ -44,6 +44,20 @@ docker compose exec app rails db:migrate
 IMAGE_TAG=1.2.0 docker compose up -d
 ```
 
+## Licensing
+
+Codeveira is **free for up to 3 users** — no license key required. Larger teams need a license key entered in **Settings → License**.
+
+| Tier       | Max users | Price       | Included users | Per extra user |
+|------------|-----------|-------------|----------------|----------------|
+| Free       | 3         | $0          | 3              | —              |
+| Standard   | 20        | $69/mo      | 5              | $10/user/mo    |
+| Extended   | 50        | $169/mo     | 10             | $14/user/mo    |
+| Enterprise | 100       | $279/mo     | 15             | $16/user/mo    |
+| Custom     | 101+      | Contact us  | —              | —              |
+
+To purchase a license or ask about Custom pricing: **hello@codeveira.com**
+
 ## Documentation
 
 Full documentation at **[codeveira.com/docs](https://codeveira.com/docs/)**.
