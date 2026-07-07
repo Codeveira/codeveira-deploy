@@ -5,6 +5,10 @@ All notable changes to Codeveira are documented here.
 ## [Unreleased]
 
 ### Added
+- **@mention notifications** (Free) — type `@username` in any comment to instantly notify the mentioned user with an in-app alert and email, even if they are not a reviewer or watcher of the review
+- **Daily digest email** (Free) — per-user opt-in in Profile → Notifications; sends one morning summary (08:00 UTC) of all unread activity grouped by review instead of per-event emails; @mentions still deliver immediately regardless of this setting
+- **Reply by email** (Free) — ActionMailbox integration; replying to a comment notification email creates a new comment on the review; requires `INBOUND_EMAIL_DOMAIN` environment variable and MX record pointing to the server
+- **Repository browser** (Free) — browse files and navigate directory trees at any branch or commit; syntax-highlighted file view; line-by-line blame with author and commit info (GitHub & GitLab); file commit history with "Browse at this SHA" navigation; branches list with default/protected badges; permalink to any file line via `#L{n}` anchor
 - Two-factor authentication (TOTP) — admin global enforcement toggle in Settings → Users; per-user setup from Profile; green 2FA badge on user list; Standard+ feature
 - **Audit log export** (Enterprise) — download the current filtered audit log view as CSV or JSON (up to 10 000 events) from Settings → Audit Log
 - **Audit webhook forwarding** (Enterprise) — configure an HTTP endpoint in Settings → Audit Log to receive every audit event as a JSON POST in real-time; compatible with Logstash HTTP input, Elastic Agent, Splunk HEC, Datadog, Graylog, and any SIEM

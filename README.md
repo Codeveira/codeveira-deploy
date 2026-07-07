@@ -61,6 +61,16 @@ To purchase a license: **hello@codeveira.com**
 
 2FA is available on **Standard and higher** tiers. Admins can enforce it globally from **Settings → Users** — users without 2FA configured will be prompted to set it up after login and cannot bypass it. Users can also enable 2FA voluntarily from their **Profile** page.
 
+## Repository Browser
+
+Each repository page includes **Browse** and **Branches** buttons. The browser lets you navigate the file tree, view syntax-highlighted files, check line-by-line blame (GitHub & GitLab), and inspect file commit history — all at any branch or commit SHA. Every line gets a `#L{n}` anchor for shareable deep links.
+
+## @Mentions, Digest & Reply by Email
+
+- **@mention** a user in any comment body to send them an immediate in-app + email notification.
+- Users can opt into a **daily digest** in Profile → Notifications instead of per-event emails.
+- **Reply by email** — set `INBOUND_EMAIL_DOMAIN` in `.env` and configure MX. Replying to a notification email posts a comment directly on the review.
+
 ## Documentation
 
 Full documentation at **[codeveira.com/docs](https://codeveira.com/docs/)**.
