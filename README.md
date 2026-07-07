@@ -46,17 +46,16 @@ IMAGE_TAG=1.2.0 docker compose up -d
 
 ## Licensing
 
-Codeveira is **free for up to 3 users** — no license key required. Larger teams need a license key entered in **Settings → License**.
+Codeveira is **free for any number of users** — no license key required (local AI models only). A license unlocks cloud AI providers and advanced features, priced per active user.
 
-| Tier       | Max users | Price       | Included users | Per extra user |
-|------------|-----------|-------------|----------------|----------------|
-| Free       | 3         | $0          | 3              | —              |
-| Standard   | 20        | $69/mo      | 5              | $10/user/mo    |
-| Extended   | 50        | $169/mo     | 10             | $14/user/mo    |
-| Enterprise | 100       | $279/mo     | 15             | $16/user/mo    |
-| Custom     | 101+      | Contact us  | —              | —              |
+| Tier       | Price          | Users     | Key features                                                                  |
+|------------|----------------|-----------|-------------------------------------------------------------------------------|
+| Free       | $0             | Unlimited | Core review, 1 local AI bot, email notifications, IDE diagnostics             |
+| Standard   | $10/user/mo    | Unlimited | Cloud AI providers, Compare, Slack/Teams, REST API, Backup, Upsource, 2FA    |
+| Extended   | $14/user/mo    | Unlimited | Multiple AI bots, Autofix, LDAP/AD, Audit log, Prometheus metrics             |
+| Enterprise | $16/user/mo    | Unlimited | All features                                                                   |
 
-To purchase a license or ask about Custom pricing: **hello@codeveira.com**
+To purchase a license: **hello@codeveira.com**
 
 ## Two-Factor Authentication
 
@@ -79,16 +78,20 @@ Full documentation at **[codeveira.com/docs](https://codeveira.com/docs/)**.
 
 ## Nginx
 
+A full nginx config template with all recommended headers and LSP TCP proxy is in [`nginx.conf.example`](nginx.conf.example).
+
+Quick reference — copy to `/etc/nginx/sites-available/codeveira` and symlink to `sites-enabled/`:
+
 ```nginx
 server {
     listen 80;
-    server_name <your-domain>;
+    server_name your-domain.example.com;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name <your-domain>;
+    server_name your-domain.example.com;
 
     ssl_certificate     /path/to/fullchain.pem;
     ssl_certificate_key /path/to/privkey.pem;
@@ -116,12 +119,14 @@ For IDE integration (LSP), add to the **top level** of `/etc/nginx/nginx.conf`:
 stream {
     server {
         listen 7777;
-        proxy_pass        127.0.0.1:7777;
-        proxy_timeout     3600s;
+        proxy_pass            127.0.0.1:7777;
+        proxy_timeout         3600s;
         proxy_connect_timeout 5s;
     }
 }
 ```
+
+Then: `nginx -t && systemctl reload nginx` and open firewall port 7777/tcp.
 
 ## Support
 

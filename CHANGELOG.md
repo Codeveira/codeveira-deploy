@@ -7,6 +7,11 @@ All notable changes to Codeveira are documented here.
 ### Added
 - Two-factor authentication (TOTP) — admin global enforcement toggle in Settings → Users; per-user setup from Profile; green 2FA badge on user list; Standard+ feature
 
+### Changed
+- **Licensing model** — removed user limits from all tiers; every tier (including Free) now supports unlimited users. License key records the number of paid seats (`paid_users`) for billing reference only — no enforcement in the application
+- Pricing changed to flat per-user rates: Standard $10/user/mo, Extended $14/user/mo, Enterprise $16/user/mo
+- `bin/generate_license` flag renamed from `--max-users` to `--paid-users`
+
 ## [1.0.0] — 2026-07-06
 
 ### Added

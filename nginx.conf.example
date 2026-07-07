@@ -1,0 +1,64 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# Codeveira — nginx site config template
+# Copy to /etc/nginx/sites-available/codeveira and symlink to sites-enabled/
+#
+# This file has TWO sections:
+#
+#  1. HTTP / HTTPS virtual hosts (below) — these go in sites-enabled/
+#     (included inside nginx's http {} block automatically).
+#
+#  2. LSP TCP stream proxy (bottom of file) — raw TCP on port 7777.
+#     Copy the stream {} block into /etc/nginx/nginx.conf at the TOP LEVEL
+#     (alongside the existing http {} block). It cannot live inside http {}.
+#     Alternative: /etc/nginx/stream.conf.d/codeveira-lsp.conf
+#
+#     Prerequisite: nginx built with --with-stream (nginx-full on Debian/Ubuntu).
+#     Check: nginx -V 2>&1 | grep -- '--with-stream'
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── HTTP → HTTPS redirect ─────────────────────────────────────────────────────
+server {
+    listen 80;
+    server_name your-domain.example.com;
+    return 301 https://$host$request_uri;
+}
+
+# ── HTTPS virtual host ────────────────────────────────────────────────────────
+server {
+    listen 443 ssl;
+    server_name your-domain.example.com;
+
+    ssl_certificate /path/to/fullchain.pem;
+    ssl_certificate_key /path/to/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        # Required for Audit Log real IP recording (Rails ActionDispatch::RemoteIp reads this header)
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_redirect off;
+        proxy_read_timeout 90;
+    }
+}
+
+# ── LSP TCP proxy (stream module — paste into /etc/nginx/nginx.conf top level) ─
+#
+# stream {
+#     server {
+#         listen 7777;
+#         # Forward to the Codeveira LSP Docker container (port mapped by docker-compose)
+#         proxy_pass 127.0.0.1:7777;
+#         proxy_timeout 3600s;   # keep long-lived editor connections alive
+#         proxy_connect_timeout 5s;
+#     }
+# }
+#
+# After adding: nginx -t && systemctl reload nginx
+# Open firewall: ufw allow 7777/tcp   (or firewall-cmd --add-port=7777/tcp --permanent)
