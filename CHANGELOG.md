@@ -8,7 +8,7 @@ All notable changes to Codeveira are documented here.
 - Two-factor authentication (TOTP) — admin global enforcement toggle in Settings → Users; per-user setup from Profile; green 2FA badge on user list; Standard+ feature
 - **Audit log export** (Enterprise) — download the current filtered audit log view as CSV or JSON (up to 10 000 events) from Settings → Audit Log
 - **Audit webhook forwarding** (Enterprise) — configure an HTTP endpoint in Settings → Audit Log to receive every audit event as a JSON POST in real-time; compatible with Logstash HTTP input, Elastic Agent, Splunk HEC, Datadog, Graylog, and any SIEM
-- **Like reactions on comments** (Free) — thumbs-up reactions on review comments; toggle with a single click, counter updates live
+- **Emoji reactions on comments** (Free) — emoji reaction picker (👍 👎 👌 💪 🤞 🙏 🎉 😎 🐛 😢 🙅 🚫 + Yes / No / +1) on every comment; multiple different reactions per user per comment; grouped counters with live updates; own reactions highlighted in blue
 - **Review watchers** (Standard+) — any user can watch a review without being assigned as a reviewer; watchers receive all notifications (comments, status changes) but don't appear in the approval progress
 - **CI status badge** (Enterprise) — CI systems (Jenkins, GitHub Actions, GitLab CI, etc.) POST build results to `/webhooks/ci`; live badge updates on review pages via Turbo Streams; configure secret token in Settings → CI Integration
 
