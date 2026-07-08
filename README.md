@@ -63,7 +63,9 @@ To purchase a license: **hello@codeveira.com**
 
 ## Repository Browser
 
-Each repository page includes **Browse** and **Branches** buttons. The browser lets you navigate the file tree, view syntax-highlighted files, check line-by-line blame (GitHub & GitLab), and inspect file commit history — all at any branch or commit SHA. Every line gets a `#L{n}` anchor for shareable deep links.
+A **unified navigation tab bar** sits at the top of every repository sub-page — README, Browse, Branches, Analytics, Members, Metrics, Edit, and All Reviews. The active section is underlined in blue. Jump between sections with one click without going back to the repository home page.
+
+The browser lets you navigate the file tree, view syntax-highlighted files, check line-by-line blame (GitHub & GitLab), and inspect file commit history — all at any branch or commit SHA. A **branch switcher dropdown** lets you change branches instantly; the file tree shows only files on the selected branch. Cmd+K fuzzy file search is scoped to the current branch. Every line gets a `#L{n}` anchor for shareable deep links.
 
 ## @Mentions, Digest & Reply by Email
 
