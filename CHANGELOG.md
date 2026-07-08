@@ -32,7 +32,12 @@ All notable changes to Codeveira are documented here.
 - **Email notifications settings** (Standard+) — new Notifications → Email tab; configure sender display name, per-event toggles, and per-event subject line templates; SMTP config shown read-only from environment variables
 - **Notification commit author** (Free) — commit author name shown in the CR review sidebar below each commit entry
 - **Configurable dashboard** (Free) — fully free-form 2D tile grid (12 columns, 100 px row height); in Edit Layout mode users drag any tile by its header to reposition it anywhere with snap-to-grid, pull right/bottom/corner handles to resize it, click × to hide a tile, restore tiles from the Add Widget panel, and reset everything to factory layout with one click; layout is saved per user as JSON and persists across sessions
+- **Dashboard — My Assigned Reviews widget** (Free) — optional tile showing only open CRs where the current user is a pending reviewer; displays author, repo, diff stats, comment count and stale badge; add via **Add widget** in Edit layout mode
+- **Dashboard — Recent Activity widget** (Free) — optional tile with a chronological feed of events across all visible reviews: new CR opened, comment posted, approval, rejection; shows actor avatar, colour-coded icon, review link and time ago; add via **Add widget** in Edit layout mode
 - **Compare — branch & file dropdowns** (Standard) — repository compare page redesigned: branches are populated automatically from each repo's branch list, files are loaded via recursive API call; inactive repositories are excluded from the repo selector; added Full Repository comparison mode showing files only in A, only in B, or in both repos with direct compare links
+
+### Fixed
+- **Backup schedule always active** — scheduled database backup (`database_backup` Sidekiq Cron job) is now registered at Sidekiq startup even when the user has never explicitly clicked **Save schedule**; default schedule is daily at 3:00 AM UTC
 
 ### Performance
 - **Diff stats pre-computed** — `additions_count` / `deletions_count` columns added to `commits` table; stats are computed once on save and read from DB instead of being parsed from raw diff text on every request; dashboard and review list performance improved significantly for large repositories
