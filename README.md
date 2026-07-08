@@ -63,9 +63,13 @@ To purchase a license: **hello@codeveira.com**
 
 ## Repository Browser
 
-A **unified navigation tab bar** sits at the top of every repository sub-page — README, Browse, Branches, Analytics, Members, Metrics, Edit, and All Reviews. The active section is underlined in blue. Jump between sections with one click without going back to the repository home page.
+A **unified navigation tab bar** sits at the top of every repository sub-page — README, Browse, Branches, Analytics, Members, Metrics, Edit, and All Reviews. The repository name in the header is a clickable link back to the repository home page. The active section is underlined in blue. Jump between sections with one click.
+
+The **repository home page** shows stat cards (open reviews, member count, last commit), a collapsible webhook setup section, and a recent reviews list with reviewer badges.
 
 The browser lets you navigate the file tree, view syntax-highlighted files, check line-by-line blame (GitHub & GitLab), and inspect file commit history — all at any branch or commit SHA. A **branch switcher dropdown** lets you change branches instantly; the file tree shows only files on the selected branch. Cmd+K fuzzy file search is scoped to the current branch. Every line gets a `#L{n}` anchor for shareable deep links.
+
+The **All Reviews** page supports filtering by status, author, and reviewer simultaneously.
 
 ## @Mentions, Digest & Reply by Email
 
