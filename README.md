@@ -51,7 +51,7 @@ Codeveira is **free for any number of users** — no license key required (local
 | Tier       | Price          | Users     | Key features                                                                  |
 |------------|----------------|-----------|-------------------------------------------------------------------------------|
 | Free       | $0             | Unlimited | Core review, 1 local AI bot, email notifications, IDE diagnostics             |
-| Standard   | $10/user/mo    | Unlimited | Cloud AI providers, Compare, Slack/Teams, REST API, Backup, 2FA, review watchers |
+| Standard   | $10/user/mo    | Unlimited | Cloud AI providers, Compare, Slack/Teams/Email/Webhook/SMS notifications, REST API, Backup, 2FA, review watchers |
 | Extended   | $14/user/mo    | Unlimited | Multiple AI bots, Autofix, LDAP/AD, Audit log, Prometheus metrics             |
 | Enterprise | $16/user/mo    | Unlimited | All features + Upsource import + audit log export/SIEM + CI status badge      |
 
