@@ -73,7 +73,7 @@ The **All Reviews** page supports filtering by status, author, and reviewer simu
 
 ## Review Templates
 
-Go to **Settings → Review Templates** to create reusable title presets. When at least one template exists, a **"Use template"** dropdown appears next to the title field on the New Review form.
+Go to **Settings → Review Templates** to create reusable title presets. A **"Use template"** dropdown always appears next to the title field on the New Review form — when no templates exist yet it shows an empty-state message with a link to create one.
 
 ## Outgoing Webhooks
 
@@ -83,9 +83,9 @@ Each repository has a **Webhooks** tab (visible to admins). Configure one or mor
 
 Press **⌘K** (Mac) or **Ctrl+K** (Windows/Linux) anywhere to open a search overlay. Searches repositories by name, reviews by title or CR number, and commits by SHA prefix. Navigate results with arrow keys, confirm with Enter, close with Esc.
 
-## Copy Commit Link
+## Copy Link
 
-On any commit diff page (or in the per-commit view of a review), click the **⎘ Copy link** button next to the SHA to copy a direct deep link to clipboard.
+A **⎘ Copy link** button appears in three places: next to the CR-ID in the review header (copies the review URL), in the commits sidebar of a review (copies the commit URL), and in the per-commit diff header. Works on both HTTPS and HTTP (falls back to `execCommand`).
 
 ## @Mentions, Digest & Reply by Email
 

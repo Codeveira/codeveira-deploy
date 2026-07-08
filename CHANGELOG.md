@@ -23,6 +23,10 @@ All notable changes to Codeveira are documented here.
 - **Diff statistics in reviews list** (Free) — additions (+N) and deletions (-M) displayed in green/red next to commit count on the All Reviews list
 - **Copy link to commit** (Free) — "⎘ Copy link" button on commit diff pages and next to each commit in the per-commit review view; copies the direct URL to clipboard
 - **Global Cmd+K search** (Free) — press ⌘K / Ctrl+K anywhere to open a search overlay; searches repositories by name, reviews by title or CR number, and commits by SHA prefix; keyboard navigation with ↑↓ arrows and Enter to open
+- **Copy link to review** (Free) — ⎘ Copy link button now also appears in the review header next to the CR-ID; copies the full review URL to clipboard
+
+### Performance
+- **Diff stats pre-computed** — `additions_count` / `deletions_count` columns added to `commits` table; stats are computed once on save and read from DB instead of being parsed from raw diff text on every request; dashboard and review list performance improved significantly for large repositories
 
 ### Changed
 - **Upsource import wizard** moved from Standard to **Enterprise** tier
