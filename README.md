@@ -87,6 +87,15 @@ Press **⌘K** (Mac) or **Ctrl+K** (Windows/Linux) anywhere to open a search ove
 
 A **⎘ Copy link** button appears in three places: next to the CR-ID in the review header (copies the review URL), in the commits sidebar of a review (copies the commit URL), and in the per-commit diff header. Works on both HTTPS and HTTP (falls back to `execCommand`).
 
+## Go to File
+
+Every file header in a diff view has a **"Go to file"** button next to "Side by side". It opens the full syntax-highlighted file in the repository browser at the exact commit SHA — so you always see the file as it was at that point in history. Available in:
+- Commit diff pages (`/repositories/:id/commits/:sha`)
+- CR combined diff view
+- CR per-commit diff view
+
+The button is hidden for deleted files (they no longer exist at that SHA).
+
 ## @Mentions, Digest & Reply by Email
 
 - **@mention** a user in any comment body to send them an immediate in-app + email notification.

@@ -24,6 +24,7 @@ All notable changes to Codeveira are documented here.
 - **Copy link to commit** (Free) — "⎘ Copy link" button on commit diff pages and next to each commit in the per-commit review view; copies the direct URL to clipboard
 - **Global Cmd+K search** (Free) — press ⌘K / Ctrl+K anywhere to open a search overlay; searches repositories by name, reviews by title or CR number, and commits by SHA prefix; keyboard navigation with ↑↓ arrows and Enter to open
 - **Copy link to review** (Free) — ⎘ Copy link button now also appears in the review header next to the CR-ID; copies the full review URL to clipboard
+- **Go to file from diff** (Free) — "Go to file" button next to "Side by side" in every file header in commit diffs and CR diffs (combined and per-commit views); opens the full syntax-highlighted file in the repository browser at the exact commit SHA
 
 ### Performance
 - **Diff stats pre-computed** — `additions_count` / `deletions_count` columns added to `commits` table; stats are computed once on save and read from DB instead of being parsed from raw diff text on every request; dashboard and review list performance improved significantly for large repositories
