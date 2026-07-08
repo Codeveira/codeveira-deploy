@@ -18,6 +18,11 @@ All notable changes to Codeveira are documented here.
 - **Emoji reactions on comments** (Free) — emoji reaction picker (👍 👎 👌 💪 🤞 🙏 🎉 😎 🐛 😢 🙅 🚫 + Yes / No / +1) on every comment; multiple different reactions per user per comment; grouped counters with live updates; own reactions highlighted in blue
 - **Review watchers** (Standard+) — any user can watch a review without being assigned as a reviewer; watchers receive all notifications (comments, status changes) but don't appear in the approval progress
 - **CI status badge** (Enterprise) — CI systems (Jenkins, GitHub Actions, GitLab CI, etc.) POST build results to `/webhooks/ci`; live badge updates on review pages via Turbo Streams; configure secret token in Settings → CI Integration
+- **Review templates** (Free) — reusable title presets for new code reviews; managed in Settings → Review Templates; "Use template" dropdown appears in the New Review form when templates exist
+- **Outgoing webhooks per repository** (Free) — each repository can POST JSON events (`review.approved`, `review.rejected`, `review.closed`, `review.reopened`, `comment.created`) to any HTTP/HTTPS endpoint; optional HMAC-SHA256 signature via `X-Codeveira-Signature`; managed under the Webhooks tab on the repository page
+- **Diff statistics in reviews list** (Free) — additions (+N) and deletions (-M) displayed in green/red next to commit count on the All Reviews list
+- **Copy link to commit** (Free) — "⎘ Copy link" button on commit diff pages and next to each commit in the per-commit review view; copies the direct URL to clipboard
+- **Global Cmd+K search** (Free) — press ⌘K / Ctrl+K anywhere to open a search overlay; searches repositories by name, reviews by title or CR number, and commits by SHA prefix; keyboard navigation with ↑↓ arrows and Enter to open
 
 ### Changed
 - **Upsource import wizard** moved from Standard to **Enterprise** tier

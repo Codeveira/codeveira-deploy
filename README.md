@@ -69,7 +69,23 @@ The **repository home page** shows stat cards (open reviews, member count, last 
 
 The browser lets you navigate the file tree, view syntax-highlighted files, check line-by-line blame (GitHub & GitLab), and inspect file commit history — all at any branch or commit SHA. A **branch switcher dropdown** lets you change branches instantly; the file tree shows only files on the selected branch. Cmd+K fuzzy file search is scoped to the current branch. Every line gets a `#L{n}` anchor for shareable deep links.
 
-The **All Reviews** page supports filtering by status, author, and reviewer simultaneously.
+The **All Reviews** page supports filtering by status, author, and reviewer simultaneously. Each review row shows **+N / -M diff statistics** (additions in green, deletions in red) so you can gauge review size at a glance.
+
+## Review Templates
+
+Go to **Settings → Review Templates** to create reusable title presets. When at least one template exists, a **"Use template"** dropdown appears next to the title field on the New Review form.
+
+## Outgoing Webhooks
+
+Each repository has a **Webhooks** tab (visible to admins). Configure one or more HTTP/HTTPS endpoints to receive JSON payloads for `review.approved`, `review.rejected`, `review.closed`, `review.reopened`, and `comment.created` events. Optional HMAC-SHA256 signing via secret token (`X-Codeveira-Signature` header).
+
+## Global Search (Cmd+K)
+
+Press **⌘K** (Mac) or **Ctrl+K** (Windows/Linux) anywhere to open a search overlay. Searches repositories by name, reviews by title or CR number, and commits by SHA prefix. Navigate results with arrow keys, confirm with Enter, close with Esc.
+
+## Copy Commit Link
+
+On any commit diff page (or in the per-commit view of a review), click the **⎘ Copy link** button next to the SHA to copy a direct deep link to clipboard.
 
 ## @Mentions, Digest & Reply by Email
 
