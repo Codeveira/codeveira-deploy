@@ -5,6 +5,7 @@ All notable changes to Codeveira are documented here.
 ## [Unreleased]
 
 ### Added
+- **Comment checklists with enforcement** (Free) — add interactive task lists to any comment using standard Markdown syntax (`- [ ] item`, `- [x] done`); checkboxes render as clickable inputs and state is persisted server-side; administrators can require all checklist items to be ticked before a review can be approved or closed (**Settings → Checklist**); enforcement can apply to all comments (`Block always`) or only to comments carrying specific labels (`Block by label`); per-repository override available in repository settings; when blocked, an amber inline warning banner on the review page lists which comments still have open items with scroll-to-comment links — no cryptic flash alerts
 - **@mention notifications** (Free) — type `@username` in any comment to instantly notify the mentioned user with an in-app alert and email, even if they are not a reviewer or watcher of the review
 - **Daily digest email** (Free) — per-user opt-in in Profile → Notifications; sends one morning summary (08:00 UTC) of all unread activity grouped by review instead of per-event emails; @mentions still deliver immediately regardless of this setting
 - **Reply by email** (Free) — ActionMailbox integration; replying to a comment notification email creates a new comment on the review; requires `INBOUND_EMAIL_DOMAIN` environment variable and MX record pointing to the server
