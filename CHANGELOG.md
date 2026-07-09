@@ -38,6 +38,8 @@ All notable changes to Codeveira are documented here.
 
 ### Fixed
 - **Backup schedule always active** — scheduled database backup (`database_backup` Sidekiq Cron job) is now registered at Sidekiq startup even when the user has never explicitly clicked **Save schedule**; default schedule is daily at 3:00 AM UTC
+- **Backup upload** (Standard) — **Upload Backup** section added to Settings → Backup & Restore; drag & drop or file picker to upload a `.dump` file from your computer; uploaded file appears in the Saved Backups list immediately and can be restored like any other snapshot; nginx `client_max_body_size` raised from 10 MB to 512 MB to accommodate large dump files
+- **Backup & Restore progress UI** (Standard) — real-time feedback for backup and restore operations: clicking **Backup now** shows a live spinner banner; on completion the banner turns green with the backup filename and the page auto-reloads; clicking **Restore** shows a full-screen blocking overlay with a spinner; when the restore finishes the overlay transitions to a green confirmation with an **OK** button that reloads the page; works correctly even after restore invalidates the user session
 
 ### Performance
 - **Diff stats pre-computed** — `additions_count` / `deletions_count` columns added to `commits` table; stats are computed once on save and read from DB instead of being parsed from raw diff text on every request; dashboard and review list performance improved significantly for large repositories
