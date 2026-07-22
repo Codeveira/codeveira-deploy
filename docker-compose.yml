@@ -64,6 +64,8 @@ services:
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM: ${SMTP_FROM}
+      SYMBOL_INDEXER_URL: http://indexer:8090
+      SYMBOL_INDEXER_TOKEN: ${SYMBOL_INDEXER_TOKEN:-}
     depends_on:
       db:
         condition: service_healthy
@@ -72,6 +74,17 @@ services:
     volumes:
       - app_storage:/app/storage
       - backup_data:/backups
+    restart: unless-stopped
+
+  indexer:
+    image: ghcr.io/codeveira/codeveira-indexer:${IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      INDEXER_PORT: 8090
+      MAX_FILE_SIZE_BYTES: "2000000"
+      INDEXER_TOKEN: ${SYMBOL_INDEXER_TOKEN:-}
+    mem_limit: ${INDEXER_MEM_LIMIT:-768m}
+    cpus: ${INDEXER_CPUS:-1.0}
     restart: unless-stopped
 
   sidekiq:
@@ -90,11 +103,15 @@ services:
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM: ${SMTP_FROM}
+      SYMBOL_INDEXER_URL: http://indexer:8090
+      SYMBOL_INDEXER_TOKEN: ${SYMBOL_INDEXER_TOKEN:-}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      indexer:
+        condition: service_started
     volumes:
       - backup_data:/backups
     restart: unless-stopped

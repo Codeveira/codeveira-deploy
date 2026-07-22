@@ -71,6 +71,16 @@ The browser lets you navigate the file tree, view syntax-highlighted files, chec
 
 The **All Reviews** page supports filtering by status, author, and reviewer simultaneously. Each review row shows **+N / -M diff statistics** (additions in green, deletions in red) so you can gauge review size at a glance.
 
+## Find Usages, Go to Declaration & Go to Symbol
+
+**Standard+.** A tree-sitter symbol index for **JavaScript, TypeScript, Ruby, Python, Go, Java, Kotlin and PHP**, built incrementally by a dedicated `indexer` container on every push — no full-repo re-index needed, only touched files are re-parsed.
+
+- **Web UI** — Ctrl+click a symbol for its declaration, Alt+click for every usage grouped by file.
+- **IDE** — the same index backs standard LSP requests, so VS Code, JetBrains, and Neovim get native **Go to Declaration** (F12), **Find All References** (Shift+F12), and **Go to Symbol in File** (Ctrl+Shift+O) — no extra plugin code required.
+- **Isolated by design** — the `indexer` container is separate from `app`/`sidekiq`/`lsp` so a parsing failure never affects review creation, comments, or notifications; its memory/CPU limits (`INDEXER_MEM_LIMIT`, `INDEXER_CPUS`) are configured independently.
+- If a repository was added before this feature existed, trigger a one-time backfill from its **Edit page → Rebuild symbol index** (admin only).
+- This is a syntactic index (tree-sitter), not a full semantic engine — it matches symbols by name within a repository/branch, not resolved type.
+
 ## Review Templates
 
 Go to **Settings → Review Templates** to create reusable title presets. A **"Use template"** dropdown always appears next to the title field on the New Review form — when no templates exist yet it shows an empty-state message with a link to create one.
@@ -109,6 +119,7 @@ Full documentation at **[codeveira.com/docs](https://codeveira.com/docs/)**.
 - [Installation](https://codeveira.com/docs/installation/)
 - [Settings](https://codeveira.com/docs/settings/)
 - [IDE Integration](https://codeveira.com/docs/ide-integration/)
+- [Repository Browser](https://codeveira.com/docs/repository-browser/)
 - [GitLab](https://codeveira.com/docs/gitlab-integration/)
 - [GitHub](https://codeveira.com/docs/github-integration/)
 - [Gitea / Forgejo](https://codeveira.com/docs/gitea-integration/)
@@ -168,6 +179,29 @@ stream {
 ```
 
 Then: `nginx -t && systemctl reload nginx` and open firewall port 7777/tcp.
+
+## Scaling & High Availability
+
+The shipped `docker-compose.yml` runs one replica of each service — enough for a single team on a single host. `app`, `sidekiq`, `lsp`, and `indexer` are stateless and safe to scale horizontally as-is:
+
+- **`app`** — sessions use Rails' default cookie store (no server affinity needed) and the codebase makes no use of `Rails.cache`, so there's no server-local cache to desync between replicas. Put a load balancer in front of multiple `app` containers.
+- **`sidekiq`** — scale with `docker compose up -d --scale sidekiq=3`; Sidekiq is designed for multiple workers pulling from the same Redis-backed queues.
+- **`lsp` / `indexer`** — both stateless per-connection/per-request; add replicas if one becomes a bottleneck.
+- **Real-time updates (ActionCable)** — already configured with the Redis adapter in production, so broadcasts fan out correctly across multiple `app` replicas, not just within one process.
+
+**Not HA out of the box:** `db` (PostgreSQL) and `redis` are single-node in this compose file, with no replication or automatic failover. For true HA, point `DATABASE_URL` / `REDIS_URL` at an externally managed HA database (RDS Multi-AZ, Cloud SQL HA, ElastiCache, or a self-managed Patroni/Sentinel cluster) instead of the bundled `db`/`redis` services — that's a better fit for your existing infrastructure than something Codeveira should reimplement.
+
+## Redis Data & Backup
+
+There's no scheduled backup job for Redis, unlike the [Backup & Restore](https://codeveira.com/docs/settings/) feature for PostgreSQL — by design, not an oversight. Everything durable (reviews, comments, users, the symbol index, audit log) lives in Postgres; Redis only holds Sidekiq's job queues and ActionCable's pub/sub, which are transient in-flight state.
+
+It's already persisted: the `redis_data` volume survives container restarts, and Redis's default RDB snapshot policy is active out of the box. AOF is off by default, so a hard crash can lose up to the last snapshot window — in practice a handful of in-flight jobs (an unprocessed webhook, an AI review run, a symbol-indexing job for the last few commits), never committed application data.
+
+If you want a point-in-time snapshot anyway (e.g. before a risky upgrade):
+
+```bash
+docker compose exec redis sh -c "tar czf - -C /data ." > redis-backup-$(date +%Y%m%d).tar.gz
+```
 
 ## Support
 
