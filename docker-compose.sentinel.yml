@@ -1,0 +1,104 @@
+# Optional Redis Sentinel topology — merge on top of docker-compose.yml to
+# switch from a single non-HA Redis to Sentinel-managed automatic failover:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.sentinel.yml up -d
+#
+# The base `redis` service stays exactly as-is and becomes the Sentinel-
+# monitored master (no rename — keeps docker-compose.yml's own healthcheck
+# and depends_on entries valid unmodified). This file only adds a replica,
+# three sentinels (quorum 2 of 3 — see redis-sentinel/sentinel.conf.template),
+# and points `app`/`sidekiq` at REDIS_SENTINELS instead of a fixed host —
+# see lib/redis_sentinel_config.rb for the client-side logic this enables.
+#
+# IMPORTANT when tearing this down: if a failover has ever actually happened
+# (redis-replica got promoted), Sentinel reconfigures the ORIGINAL `redis`
+# container as a replica of the new master when it rejoins — that's correct
+# behavior while Sentinel is running, but if you then remove redis-replica/
+# the sentinels and go back to plain docker-compose.yml, `redis` is left
+# stuck read-only, pointed at a host that no longer exists (Sidekiq will
+# crash-loop on `READONLY You can't write against a read only replica`).
+# Before reverting, always run: docker exec <redis container> redis-cli
+# replicaof no one — confirmed with `redis-cli info replication` (role
+# should read "master") — to promote it back to a standalone master first.
+services:
+  redis-replica:
+    image: redis:7-alpine
+    command: redis-server --replicaof redis 6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  sentinel-1:
+    image: redis:7-alpine
+    volumes:
+      - ./redis-sentinel/sentinel.conf.template:/etc/redis/sentinel.conf.template:ro
+    command: sh -c "cp /etc/redis/sentinel.conf.template /tmp/sentinel.conf && redis-server /tmp/sentinel.conf --sentinel"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      redis-replica:
+        condition: service_healthy
+    restart: unless-stopped
+
+  sentinel-2:
+    image: redis:7-alpine
+    volumes:
+      - ./redis-sentinel/sentinel.conf.template:/etc/redis/sentinel.conf.template:ro
+    command: sh -c "cp /etc/redis/sentinel.conf.template /tmp/sentinel.conf && redis-server /tmp/sentinel.conf --sentinel"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      redis-replica:
+        condition: service_healthy
+    restart: unless-stopped
+
+  sentinel-3:
+    image: redis:7-alpine
+    volumes:
+      - ./redis-sentinel/sentinel.conf.template:/etc/redis/sentinel.conf.template:ro
+    command: sh -c "cp /etc/redis/sentinel.conf.template /tmp/sentinel.conf && redis-server /tmp/sentinel.conf --sentinel"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      redis-replica:
+        condition: service_healthy
+    restart: unless-stopped
+
+  app:
+    environment:
+      REDIS_SENTINELS: sentinel-1:26379,sentinel-2:26379,sentinel-3:26379
+      REDIS_MASTER_NAME: mymaster
+    depends_on:
+      sentinel-1:
+        condition: service_healthy
+      sentinel-2:
+        condition: service_healthy
+      sentinel-3:
+        condition: service_healthy
+
+  sidekiq:
+    environment:
+      REDIS_SENTINELS: sentinel-1:26379,sentinel-2:26379,sentinel-3:26379
+      REDIS_MASTER_NAME: mymaster
+    depends_on:
+      sentinel-1:
+        condition: service_healthy
+      sentinel-2:
+        condition: service_healthy
+      sentinel-3:
+        condition: service_healthy

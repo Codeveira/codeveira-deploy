@@ -37,6 +37,9 @@ services:
       DATABASE_URL: postgresql://codereview:${DB_PASSWORD:-secret}@db/codereview
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY: ${ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY}
+      ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY: ${ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY}
+      ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT: ${ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT}
       APP_HOST: ${APP_HOST}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme123}
@@ -52,6 +55,8 @@ services:
       GITEA_WEBHOOK_SECRET: ${GITEA_WEBHOOK_SECRET}
       BITBUCKET_WEBHOOK_SECRET: ${BITBUCKET_WEBHOOK_SECRET}
       BITBUCKET_SERVER_WEBHOOK_SECRET: ${BITBUCKET_SERVER_WEBHOOK_SECRET}
+      AZURE_WEBHOOK_SECRET: ${AZURE_WEBHOOK_SECRET}
+      GERRIT_WEBHOOK_SECRET: ${GERRIT_WEBHOOK_SECRET}
       LDAP_HOST: ${LDAP_HOST}
       LDAP_PORT: ${LDAP_PORT:-389}
       LDAP_SSL: ${LDAP_SSL:-false}
@@ -74,6 +79,9 @@ services:
     volumes:
       - app_storage:/app/storage
       - backup_data:/backups
+      - nginx_certs:/etc/letsencrypt
+      - nginx_conf:/etc/nginx/conf.d
+      - acme_webroot:/var/www/acme-challenge
     restart: unless-stopped
 
   indexer:
@@ -96,6 +104,9 @@ services:
       DATABASE_URL: postgresql://codereview:${DB_PASSWORD:-secret}@db/codereview
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY: ${ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY}
+      ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY: ${ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY}
+      ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT: ${ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT}
       APP_HOST: ${APP_HOST}
       GITLAB_URL: ${GITLAB_URL}
       SMTP_HOST: ${SMTP_HOST}
@@ -114,6 +125,9 @@ services:
         condition: service_started
     volumes:
       - backup_data:/backups
+      - nginx_certs:/etc/letsencrypt
+      - nginx_conf:/etc/nginx/conf.d
+      - acme_webroot:/var/www/acme-challenge
     restart: unless-stopped
 
   lsp:
@@ -128,8 +142,31 @@ services:
       - app
     restart: unless-stopped
 
+  # Reverse proxy + TLS termination. Boots with a zero-config self-signed
+  # certificate; configure a real domain and either upload your own
+  # certificate or issue one automatically via Let's Encrypt (HTTP-01 or
+  # DNS-01) from Settings → Domain & HTTPS once the app is running. See the
+  # "Domain & HTTPS" section below.
+  nginx:
+    image: ghcr.io/codeveira/codeveira-nginx:${IMAGE_TAG:-latest}
+    pull_policy: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - nginx_certs:/etc/letsencrypt
+      - nginx_conf:/etc/nginx/conf.d
+      - acme_webroot:/var/www/acme-challenge
+    depends_on:
+      - app
+      - lsp
+    restart: unless-stopped
+
 volumes:
   db_data:
   redis_data:
   app_storage:
   backup_data:
+  nginx_certs:
+  nginx_conf:
+  acme_webroot:

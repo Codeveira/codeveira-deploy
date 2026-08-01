@@ -7,7 +7,7 @@
 
 - Docker Engine 24+
 - Docker Compose v2
-- A domain with SSL certificate (recommended)
+- A domain pointed at this server (optional — Codeveira issues/renews its own TLS certificate for it via the built-in `nginx` container and Let's Encrypt; see [Domain & HTTPS](#domain--https))
 
 ## Quick Start
 
@@ -18,7 +18,10 @@ cd codeveira-deploy
 
 # 2. Configure
 cp .env.example .env
-# Edit .env — required: DB_PASSWORD, SECRET_KEY_BASE, APP_HOST
+# Edit .env — required: DB_PASSWORD, SECRET_KEY_BASE, APP_HOST,
+# ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY, ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY,
+# ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT (generate with:
+# docker compose run --rm app rails db:encryption:init)
 
 # 3. Start
 docker compose up -d
@@ -37,6 +40,10 @@ docker compose pull
 docker compose up -d
 docker compose exec app rails db:migrate
 ```
+
+> **Upgrading from before the encryption-at-rest release?** Add `ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY`, `ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY`, and `ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT` to `.env` first (see `.env.example`) — the app won't boot without them. Existing repository tokens, AI provider keys, and similar secrets stay readable during the upgrade and get encrypted automatically when `rails db:migrate` runs.
+>
+> Also add `AZURE_WEBHOOK_SECRET`/`GERRIT_WEBHOOK_SECRET` if you use those integrations — their webhooks now require authentication (HTTP Basic Auth) where they previously accepted any request.
 
 ## Pinning a version
 
@@ -128,57 +135,19 @@ Full documentation at **[codeveira.com/docs](https://codeveira.com/docs/)**.
 - [Gerrit](https://codeveira.com/docs/gerrit-integration/)
 - [LDAP](https://codeveira.com/docs/ldap/)
 
-## Nginx
+## Domain & HTTPS
 
-A full nginx config template with all recommended headers and LSP TCP proxy is in [`nginx.conf.example`](nginx.conf.example).
+Codeveira ships with a **built-in `nginx` reverse-proxy container** — no separate reverse proxy to install or configure on the host. It's included in `docker-compose.yml` above and boots with a zero-config self-signed certificate on ports 80/443, proxying both the web app and the LSP TCP port (7777) automatically.
 
-Quick reference — copy to `/etc/nginx/sites-available/codeveira` and symlink to `sites-enabled/`:
+To go live on a real domain, sign in as an admin and go to **Settings → Domain & HTTPS**:
 
-```nginx
-server {
-    listen 80;
-    server_name your-domain.example.com;
-    return 301 https://$host$request_uri;
-}
+- **Upload your own certificate** — paste in a PEM cert/key pair from any CA, applied immediately.
+- **Let's Encrypt — HTTP-01** — simplest option if this server is reachable on port 80 from the public internet. Codeveira runs `certbot` for you and renews automatically twice a day.
+- **Let's Encrypt — DNS-01** — works without exposing port 80, and supports wildcard domains. Supported DNS providers: **Cloudflare, AWS Route 53, Google Cloud DNS**.
 
-server {
-    listen 443 ssl;
-    server_name your-domain.example.com;
+No manual nginx config, no `certbot` install on the host, no cron job to set up — it's all handled inside the `nginx`/`sidekiq` containers, coordinated through the `nginx_certs`/`nginx_conf` volumes already declared in `docker-compose.yml`.
 
-    ssl_certificate     /path/to/fullchain.pem;
-    ssl_certificate_key /path/to/privkey.pem;
-    ssl_protocols       TLSv1.2 TLSv1.3;
-    ssl_ciphers         HIGH:!aNULL:!MD5;
-
-    client_max_body_size 10m;
-
-    location / {
-        proxy_pass         http://localhost:3000;
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto https;
-        proxy_set_header   X-Forwarded-Host  $host;
-        proxy_redirect     off;
-        proxy_read_timeout 90;
-    }
-}
-```
-
-For IDE integration (LSP), add to the **top level** of `/etc/nginx/nginx.conf`:
-
-```nginx
-stream {
-    server {
-        listen 7777;
-        proxy_pass            127.0.0.1:7777;
-        proxy_timeout         3600s;
-        proxy_connect_timeout 5s;
-    }
-}
-```
-
-Then: `nginx -t && systemctl reload nginx` and open firewall port 7777/tcp.
+If you'd rather run your own reverse proxy in front of Codeveira instead (e.g. an existing host-level nginx/Caddy/Traefik shared across other services), that still works — just don't publish the bundled `nginx` container's ports and point your own proxy at `app:3000` (and `lsp:7777` for IDE integration, over raw TCP, not HTTP). A reference host-nginx config is kept in [`nginx.conf.example`](nginx.conf.example) for that case.
 
 ## Scaling & High Availability
 
@@ -189,7 +158,19 @@ The shipped `docker-compose.yml` runs one replica of each service — enough for
 - **`lsp` / `indexer`** — both stateless per-connection/per-request; add replicas if one becomes a bottleneck.
 - **Real-time updates (ActionCable)** — already configured with the Redis adapter in production, so broadcasts fan out correctly across multiple `app` replicas, not just within one process.
 
-**Not HA out of the box:** `db` (PostgreSQL) and `redis` are single-node in this compose file, with no replication or automatic failover. For true HA, point `DATABASE_URL` / `REDIS_URL` at an externally managed HA database (RDS Multi-AZ, Cloud SQL HA, ElastiCache, or a self-managed Patroni/Sentinel cluster) instead of the bundled `db`/`redis` services — that's a better fit for your existing infrastructure than something Codeveira should reimplement.
+**Not HA out of the box:** `db` (PostgreSQL) and `redis` are single-node in this compose file, with no replication or automatic failover. For Postgres, point `DATABASE_URL` at an externally managed HA database (RDS Multi-AZ, Cloud SQL HA, or a self-managed Patroni cluster) instead of the bundled `db` service. Redis has a built-in HA option — see below.
+
+## Redis Sentinel (optional)
+
+The default `redis` service is a single non-HA instance. To run Redis with automatic master failover instead, merge the included Sentinel topology on top:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.sentinel.yml up -d
+```
+
+This adds a replica and three Sentinel instances (quorum 2 of 3) and points `app`/`sidekiq` at them via `REDIS_SENTINELS`/`REDIS_MASTER_NAME` instead of a fixed host — both Sidekiq and ActionCable's Redis clients are Sentinel-aware, so they auto-discover the current master and reconnect after a failover without a restart. The base `docker-compose.yml` is unmodified either way; switching back is just dropping the `-f docker-compose.sentinel.yml`. See `lib/redis_sentinel_config.rb` in the app image for the connection logic, and `redis-sentinel/sentinel.conf.template` for the Sentinel config.
+
+**Before switching back to plain `docker-compose.yml`:** if a failover ever actually happened while Sentinel was running, the original `redis` container gets reconfigured as a *replica* of whichever node got promoted — correct while Sentinel is managing it, but if you then remove the Sentinel containers it's left stuck read-only, pointed at a host that no longer exists (Sidekiq will crash-loop with `READONLY You can't write against a read only replica`). Promote it back to a standalone master first: `docker exec <redis container> redis-cli replicaof no one` (confirm with `redis-cli info replication` — `role` should read `master`).
 
 ## Redis Data & Backup
 

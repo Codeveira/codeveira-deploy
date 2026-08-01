@@ -1,0 +1,18 @@
+# Identical for all three sentinel-N services in docker-compose.sentinel.yml —
+# Sentinel discovers its peers and the replica via gossip once pointed at the
+# master, so no per-instance customization is needed here. Mounted read-only
+# and copied into each container's own writable layer at startup (see the
+# `command:` in docker-compose.sentinel.yml) since Sentinel rewrites this file
+# at runtime to persist discovered state, and three containers sharing one
+# host-mounted file would clobber each other's rewrites.
+port 26379
+# Sentinel refuses hostnames in `sentinel monitor` (and in what it reports
+# back to clients) unless these are explicitly turned on — without them it
+# demands raw IPs, which don't work for Docker Compose service names since
+# container IPs aren't stable/known in advance.
+sentinel resolve-hostnames yes
+sentinel announce-hostnames yes
+sentinel monitor mymaster redis 6379 2
+sentinel down-after-milliseconds mymaster 5000
+sentinel failover-timeout mymaster 10000
+sentinel parallel-syncs mymaster 1

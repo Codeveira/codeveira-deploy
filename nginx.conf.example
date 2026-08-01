@@ -1,5 +1,12 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # Codeveira — nginx site config template
+#
+# NOTE: this is only needed if you want to run your OWN host-level nginx in
+# front of Codeveira instead of the bundled `nginx` container that already
+# ships in docker-compose.yml (which handles this automatically, including
+# Let's Encrypt via Settings → Domain & HTTPS — see the README). Use this
+# file only if you're proxying Codeveira behind an existing shared nginx.
+#
 # Copy to /etc/nginx/sites-available/codeveira and symlink to sites-enabled/
 #
 # This file has TWO sections:
