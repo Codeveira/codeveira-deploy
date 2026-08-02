@@ -1,0 +1,3 @@
+# Secrets and local config
+.env
+/monitoring/prometheus_token

@@ -1,0 +1,217 @@
+{
+  "id": null,
+  "uid": "codeveira-overview",
+  "title": "Codeveira — Review Health & Bottlenecks",
+  "description": "Review throughput, cycle time, and per-reviewer bottleneck detection, scraped from Codeveira's /metrics endpoint.",
+  "tags": ["codeveira"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Open Reviews",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_reviews_open", "refId": "A", "legendFormat": "open", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none", "textMode": "auto" }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Stale Reviews (>7d open)",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_reviews_stale", "refId": "A", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none", "textMode": "auto" }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Reviews Created (24h)",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_reviews_created_24h", "refId": "A", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none", "textMode": "auto" }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Scrape Duration",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_scrape_duration_seconds", "refId": "A", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none", "textMode": "auto" }
+    },
+
+    {
+      "id": 10,
+      "type": "piechart",
+      "title": "Reviews by Status",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_reviews_total", "refId": "A", "legendFormat": "{{status}}", "instant": true }
+      ],
+      "options": { "legend": { "displayMode": "table", "placement": "right", "values": ["value"] }, "pieType": "donut" }
+    },
+    {
+      "id": 11,
+      "type": "bargauge",
+      "title": "Open Reviews per Repository",
+      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_repository_reviews_open", "refId": "A", "legendFormat": "{{repository}}", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "color": { "mode": "continuous-BlPu" } }, "overrides": [] },
+      "options": { "displayMode": "gradient", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Cycle Time per Repository (p50 / p90, last 30d)",
+      "description": "Median and 90th-percentile time from a review being opened to being approved/closed.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_cycle_time_p50_seconds", "refId": "A", "legendFormat": "p50 — {{repository}}" },
+        { "expr": "codeveira_cycle_time_p90_seconds", "refId": "B", "legendFormat": "p90 — {{repository}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 5 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } }
+    },
+
+    {
+      "id": 30,
+      "type": "bargauge",
+      "title": "Reviewer Backlog — Pending Assignments",
+      "description": "Open reviews currently awaiting each human reviewer. Sustained high values indicate a bottleneck.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_reviewer_pending_assignments", "refId": "A", "legendFormat": "{{reviewer}}", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 5 }, { "color": "red", "value": 10 }] } }, "overrides": [] },
+      "options": { "displayMode": "gradient", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 31,
+      "type": "table",
+      "title": "Reviewer Backlog — Stale (>7d pending)",
+      "description": "Assignments nobody has acted on in over a week — the clearest single signal of who is currently blocking reviews.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_reviewer_stale_assignments > 0", "refId": "A", "format": "table", "instant": true }
+      ],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true }, "renameByName": { "reviewer": "Reviewer", "Value": "Stale assignments" } } }
+      ],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "yellow", "value": null }, { "color": "red", "value": 3 }] }, "custom": { "cellOptions": { "type": "color-background" } } }, "overrides": [] }
+    },
+
+    {
+      "id": 40,
+      "type": "bargauge",
+      "title": "Reviewer Decision Time — p50 (last 30d)",
+      "description": "Median time from being assigned to actually approving/rejecting.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_reviewer_decision_time_p50_seconds", "refId": "A", "legendFormat": "{{reviewer}}", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "color": { "mode": "continuous-GrYlRd" } }, "overrides": [] },
+      "options": { "displayMode": "gradient", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 41,
+      "type": "bargauge",
+      "title": "Reviewer Decision Time — p90 (last 30d)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_reviewer_decision_time_p90_seconds", "refId": "A", "legendFormat": "{{reviewer}}", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "color": { "mode": "continuous-GrYlRd" } }, "overrides": [] },
+      "options": { "displayMode": "gradient", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+
+    {
+      "id": 50,
+      "type": "stat",
+      "title": "Webhook Failures (24h)",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 36 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_webhook_failures_24h", "refId": "A", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none", "textMode": "auto" }
+    },
+    {
+      "id": 51,
+      "type": "stat",
+      "title": "Comments (24h)",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 36 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_comments_24h", "refId": "A", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none", "textMode": "auto" }
+    },
+    {
+      "id": 52,
+      "type": "piechart",
+      "title": "Users by Type",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 36 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_users_total", "refId": "A", "legendFormat": "{{type}}", "instant": true }
+      ],
+      "options": { "legend": { "displayMode": "table", "placement": "right", "values": ["value"] }, "pieType": "donut" }
+    },
+    {
+      "id": 53,
+      "type": "bargauge",
+      "title": "Webhook Deliveries by Status (all time)",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 36 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_webhook_deliveries_total", "refId": "A", "legendFormat": "{{status}}", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": { "displayMode": "gradient", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+
+    {
+      "id": 60,
+      "type": "bargauge",
+      "title": "Audit Events (24h) by Category",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 42 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_audit_events_24h", "refId": "A", "legendFormat": "{{category}}", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": { "displayMode": "gradient", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    }
+  ]
+}

@@ -94,7 +94,9 @@ Go to **Settings → Review Templates** to create reusable title presets. A **"U
 
 ## Outgoing Webhooks
 
-Each repository has a **Webhooks** tab (visible to admins). Configure one or more HTTP/HTTPS endpoints to receive JSON payloads for `review.approved`, `review.rejected`, `review.closed`, `review.reopened`, and `comment.created` events. Optional HMAC-SHA256 signing via secret token (`X-Codeveira-Signature` header).
+Each repository has a **Webhooks** tab (visible to admins). Configure one or more HTTP/HTTPS endpoints to receive JSON payloads for `review.opened`, `review.approved`, `review.rejected`, `review.closed`, `review.reopened`, and `comment.created` events. Optional HMAC-SHA256 signing via secret token (`X-Codeveira-Signature` header).
+
+This is also the standardized way to connect a task tracker (Jira, YouTrack, Linear, Azure Boards, or anything else) — every payload includes `ticket_keys` (auto-extracted from the CR's title/branch, e.g. `PROJ-123`, pattern overridable per repository) and `review.url` (a direct link back to the CR), so the tracker's own automation (a Jira Automation "incoming webhook" rule, a YouTrack workflow, a Zapier/Make recipe) can match the delivery to its issue with no Codeveira-specific code on its end.
 
 ## Global Search (Cmd+K)
 
@@ -171,6 +173,25 @@ docker compose -f docker-compose.yml -f docker-compose.sentinel.yml up -d
 This adds a replica and three Sentinel instances (quorum 2 of 3) and points `app`/`sidekiq` at them via `REDIS_SENTINELS`/`REDIS_MASTER_NAME` instead of a fixed host — both Sidekiq and ActionCable's Redis clients are Sentinel-aware, so they auto-discover the current master and reconnect after a failover without a restart. The base `docker-compose.yml` is unmodified either way; switching back is just dropping the `-f docker-compose.sentinel.yml`. See `lib/redis_sentinel_config.rb` in the app image for the connection logic, and `redis-sentinel/sentinel.conf.template` for the Sentinel config.
 
 **Before switching back to plain `docker-compose.yml`:** if a failover ever actually happened while Sentinel was running, the original `redis` container gets reconfigured as a *replica* of whichever node got promoted — correct while Sentinel is managing it, but if you then remove the Sentinel containers it's left stuck read-only, pointed at a host that no longer exists (Sidekiq will crash-loop with `READONLY You can't write against a read only replica`). Promote it back to a standalone master first: `docker exec <redis container> redis-cli replicaof no one` (confirm with `redis-cli info replication` — `role` should read `master`).
+
+## Monitoring (optional)
+
+A ready-made Prometheus + Grafana + Loki/Promtail stack, merged on top of the base compose file the same way Redis Sentinel is:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+```
+
+One-time setup:
+1. Create a service account (**Settings → Users → New Service Account**), generate its API token, and paste it into `monitoring/prometheus_token` (see `monitoring/prometheus_token.example`) — Prometheus reads the token from that file at scrape time via `credentials_file`, so the secret never goes into a compose/env file.
+2. Set `GRAFANA_ADMIN_PASSWORD` in `.env`.
+
+Grafana comes up at `:3001` (`admin` / `GRAFANA_ADMIN_PASSWORD`) with two dashboards already provisioned — no manual datasource or import step:
+
+- **Codeveira — Review Health & Bottlenecks** — review throughput, cycle time, and per-reviewer bottleneck detection (who's got a backlog, whose assignments have sat pending >7 days, assignment→decision time), from the `/metrics` endpoint above.
+- **Nginx — Connections & Security** — who's connecting to the instance and any failed/suspicious requests by IP (a spike of 404s/401s from one address is what a scan or brute-force attempt looks like here), sourced from nginx's own access log via Loki rather than a Prometheus metric — client IP is unbounded-cardinality data, so it's shipped as logs, not a label.
+
+Prometheus itself is exposed at `:9090` for ad-hoc queries. Loki/Promtail have no exposed ports — Grafana talks to them over the internal Docker network only.
 
 ## Redis Data & Backup
 

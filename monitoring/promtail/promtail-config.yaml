@@ -1,0 +1,42 @@
+server:
+  http_listen_port: 9080
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Reads the nginx container's own log stream via the Docker API (the base
+  # nginx:alpine image already symlinks access.log/error.log to
+  # /dev/stdout//dev/stderr) — no nginx config change, no extra volume mount,
+  # just the Docker socket.
+  - job_name: nginx
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+        filters:
+          - name: name
+            values: ["codereview-nginx-1"]
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+      - target_label: job
+        replacement: nginx
+    pipeline_stages:
+      - regex:
+          # Matches nginx.conf's `log_format main` exactly.
+          expression: '^(?P<remote_addr>\S+) - (?P<remote_user>\S+) \[(?P<time_local>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) (?P<proto>[^"]+)" (?P<status>\d+) (?P<size>\d+) "(?P<referer>[^"]*)" "(?P<agent>[^"]*)"'
+      # status/method are low-cardinality (a few dozen values at most) — safe
+      # as real Loki labels, letting dashboard panels filter/aggregate on them
+      # cheaply. remote_addr/path are NOT labels (unbounded cardinality —
+      # every distinct client IP would otherwise become its own log stream);
+      # attached as structured metadata instead, so they're still queryable
+      # per-line in Grafana without an unbounded label set.
+      - labels:
+          status:
+          method:
+      - structured_metadata:
+          remote_addr:
+          path:

@@ -1,0 +1,76 @@
+# Optional Prometheus + Grafana stack — merge on top of docker-compose.yml
+# to scrape the existing /metrics endpoint (Settings > License: requires an
+# Extended license or higher) and get a ready-made dashboard:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+#
+# One-time setup before starting:
+#   1. Create a service account user (Settings > Users, or `bin/rails
+#      runner 'User.create!(...)'`), generate its API token, and copy it
+#      into ./monitoring/prometheus_token (see prometheus_token.example) —
+#      Prometheus reads the token from that file at scrape time via
+#      `credentials_file`, so no secret ever goes into a compose/env file.
+#   2. Set GRAFANA_ADMIN_PASSWORD in .env.
+#
+# Grafana is reachable at http://localhost:3001 (admin / GRAFANA_ADMIN_PASSWORD)
+# with the "Codeveira — Review Health & Bottlenecks" and "Nginx — Connections
+# & Security" dashboards already provisioned — no manual datasource or import
+# step needed. Prometheus itself is exposed at :9090 for ad-hoc queries.
+#
+# The nginx dashboard (who's connecting, failed/suspicious requests by IP) is
+# powered by Loki + Promtail, not Prometheus — client IPs are unbounded,
+# high-cardinality data that doesn't belong in a Prometheus label, so nginx's
+# access log is shipped to Loki instead and queried as logs. Promtail reads
+# the log stream straight from the `nginx` container via the Docker API (the
+# base nginx:alpine image already symlinks access.log to /dev/stdout) — no
+# nginx config change and no extra volume needed, just read-only access to
+# the Docker socket.
+services:
+  prometheus:
+    image: prom/prometheus:v3.13.2
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus_token:/etc/prometheus/token:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.4.6
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.6.13
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ./monitoring/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki_data:/loki
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:3.6.11
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    volumes:
+      - ./monitoring/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  loki_data:
