@@ -94,9 +94,13 @@ Go to **Settings → Review Templates** to create reusable title presets. A **"U
 
 ## Outgoing Webhooks
 
-Each repository has a **Webhooks** tab (visible to admins). Configure one or more HTTP/HTTPS endpoints to receive JSON payloads for `review.opened`, `review.approved`, `review.rejected`, `review.closed`, `review.reopened`, and `comment.created` events. Optional HMAC-SHA256 signing via secret token (`X-Codeveira-Signature` header).
+**Settings → Outgoing Webhooks** (global admin) configures the default set of HTTP/HTTPS endpoints every repository fires against out of the box — one config for the whole instance. A repository only needs its own instead if it must notify a different endpoint/tracker: tick **"Use this repository's own outgoing webhooks"** on the repository's Edit page, and its own **Webhooks** tab (repository page → Webhooks) then takes over completely for that repository, ignoring the global list. Either scope supports any number of webhooks, each subscribed to a different set of `review.opened`, `review.approved`, `review.rejected`, `review.closed`, `review.reopened`, and `comment.created` events, with optional HMAC-SHA256 signing via secret token (`X-Codeveira-Signature` header).
+
+Not to be confused with the single **Global Outgoing Webhook** under Notifications → Webhook (Standard+), which is a chat-style notification channel alongside Slack/Teams/SMS — this is a separate system, purpose-built for task-tracker/automation integration.
 
 This is also the standardized way to connect a task tracker (Jira, YouTrack, Linear, Azure Boards, or anything else) — every payload includes `ticket_keys` (auto-extracted from the CR's title/branch, e.g. `PROJ-123`, pattern overridable per repository) and `review.url` (a direct link back to the CR), so the tracker's own automation (a Jira Automation "incoming webhook" rule, a YouTrack workflow, a Zapier/Make recipe) can match the delivery to its issue with no Codeveira-specific code on its end.
+
+Upgrading from an earlier version: any repository that already had its own webhooks configured is automatically switched to "use this repository's own outgoing webhooks" so its deliveries keep firing unchanged — the global list starts out empty until you add something to it.
 
 ## Global Search (Cmd+K)
 
