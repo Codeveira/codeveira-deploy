@@ -25,11 +25,14 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # No `ports:` here on purpose — the bundled `nginx` container (below) is the
+  # only published entry point for HTTP traffic, so every request actually
+  # gets TLS. Running your own external reverse proxy instead? See "Bring
+  # your own reverse proxy" in the README — merge docker-compose.byo-proxy.yml
+  # to republish this port.
   app:
     image: ghcr.io/codeveira/codeveira:${IMAGE_TAG:-latest}
     pull_policy: always
-    ports:
-      - "3000:3000"
     environment:
       RAILS_ENV: production
       RAILS_LOG_TO_STDOUT: "true"
@@ -147,11 +150,11 @@ services:
       - acme_webroot:/var/www/acme-challenge
     restart: unless-stopped
 
+  # No `ports:` here either — nginx's stream {} block already proxies host
+  # port 7777 to this container. See the `app` service note above.
   lsp:
     image: ghcr.io/codeveira/codeveira-lsp:${IMAGE_TAG:-latest}
     pull_policy: always
-    ports:
-      - "${LSP_PORT:-7777}:7777"
     environment:
       CODEVEIRA_URL: http://app:3000
       LSP_PORT: 7777
@@ -170,6 +173,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "${LSP_PORT:-7777}:7777"
     volumes:
       - nginx_certs:/etc/letsencrypt
       - nginx_conf:/etc/nginx/conf.d

@@ -196,7 +196,7 @@ To go live on a real domain, sign in as an admin and go to **Settings → Domain
 
 No manual nginx config, no `certbot` install on the host, no cron job to set up — it's all handled inside the `nginx`/`sidekiq` containers, coordinated through the `nginx_certs`/`nginx_conf` volumes already declared in `docker-compose.yml`.
 
-If you'd rather run your own reverse proxy in front of Codeveira instead (e.g. an existing host-level nginx/Caddy/Traefik shared across other services), that still works — just don't publish the bundled `nginx` container's ports and point your own proxy at `app:3000` (and `lsp:7777` for IDE integration, over raw TCP, not HTTP). A reference host-nginx config is kept in [`nginx.conf.example`](nginx.conf.example) for that case.
+If you'd rather run your own reverse proxy in front of Codeveira instead (e.g. an existing host-level nginx/Caddy/Traefik shared across other services), that still works. By default `app:3000` and `lsp:7777` are internal-network-only (only the bundled `nginx` container publishes anything to the host, so every request actually gets TLS) — merge `docker-compose.byo-proxy.yml` to republish them: `docker compose -f docker-compose.yml -f docker-compose.byo-proxy.yml up -d`, and comment out the bundled nginx's own `ports:` block in `docker-compose.yml` (Compose merges `ports:` lists additively across `-f` files, so that block can't be removed via the override alone). Then point your own proxy at `app:3000` (and `lsp:7777` for IDE integration, over raw TCP, not HTTP). A reference host-nginx config is kept in [`nginx.conf.example`](nginx.conf.example) for that case.
 
 ## Scaling & High Availability
 

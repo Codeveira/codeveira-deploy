@@ -1,0 +1,26 @@
+# Optional override for running your own external reverse proxy (host-level
+# nginx/Caddy/Traefik, or one shared across other services on the same box)
+# instead of the bundled `nginx` container. By default (plain `docker compose
+# up`) the bundled nginx is the *only* published entry point — app:3000 and
+# lsp:7777 are internal-network-only, so every request actually goes through
+# TLS. This file republishes those two ports directly to the host so your own
+# proxy can reach them, for the case where you don't want the bundled nginx
+# in front at all:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.byo-proxy.yml up -d
+#
+# Docker Compose merges `ports:` lists additively across -f files — it cannot
+# subtract the bundled nginx's own 80/443/7777 publish, so also comment out
+# nginx's `ports:` block in docker-compose.yml by hand (or just don't start
+# the nginx service at all: add `docker compose ... up -d --scale nginx=0`,
+# or remove it from the command entirely). See "Bring your own reverse
+# proxy" in the README for the full walkthrough, including an
+# nginx.conf.example reference config for the host-level proxy itself.
+services:
+  app:
+    ports:
+      - "3000:3000"
+
+  lsp:
+    ports:
+      - "${LSP_PORT:-7777}:7777"
