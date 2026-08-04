@@ -102,6 +102,49 @@ This is also the standardized way to connect a task tracker (Jira, YouTrack, Lin
 
 Upgrading from an earlier version: any repository that already had its own webhooks configured is automatically switched to "use this repository's own outgoing webhooks" so its deliveries keep firing unchanged — the global list starts out empty until you add something to it.
 
+## Code Coverage (Enterprise)
+
+Upload a coverage report from your CI test run and Codeveira overlays it directly on the diff view — a green stripe on covered lines, red on uncovered, in both the combined and side-by-side views. Codeveira never runs your tests or compiles anything itself for this — it's pure ingest and display of a report CI already produced.
+
+POST to `/webhooks/ci/coverage` (multipart form: `commit_sha`, optional `pipeline_name`/`format`, and the `report` file) using the same token as the CI status webhook, configured under **Settings → CI Integration**. Format is auto-detected from content when not specified:
+
+- `lcov` — nyc/istanbul (JS/TS), gcov/lcov (C/C++)
+- `jacoco` — JaCoCo XML (Java/Kotlin)
+- `cobertura` — Cobertura XML, also an export option from Python's coverage.py and PHPUnit
+- `simplecov` — SimpleCov `.resultset.json` (Ruby)
+- `go_cover` — `go tool cover` profile (Go)
+
+A summary card on the review page shows coverage percentage, lines covered/total, format, and pipeline name, with a warning if the report predates the review's current HEAD commit.
+
+## Architectural Lint & Duplicate Code Detection (Standard+)
+
+Two independent checks, both off by default, both on **Settings → Architectural Lint**, both posting inline review comments from a dedicated bot account.
+
+- **Architectural Lint** — Ruby (raw-SQL string interpolation) and TypeScript (explicit `any`) use the same tree-sitter parse the symbol indexer already does. **Go**, **Python**, **PHP**, **Java**, **Kotlin**, **Ruby**, and **JavaScript** are additionally checked by real external linters — `golangci-lint`, `Pylint`, `PHP_CodeSniffer`, `PMD`, `detekt`, `RuboCop`, and `ESLint` — running in a dedicated `lint-runner` container that starts automatically with the rest of the stack. All run fully offline: only checks confirmed not to need the target repository's own dependencies installed are enabled, so nothing is fetched over the network and no target code is ever executed — same trust model as the tree-sitter rules next to them. Posts as **Lint Bot**.
+- **Duplicate Code Detection** — flags a changed method that's near-identical to another method anywhere in the repository. Every function/method-sized definition (4+ lines) already gets a body-only, whitespace-normalized fingerprint during indexing, so a duplicate is just a same-fingerprint lookup against existing data — no external tool, no extra scan. Catches exact-after-formatting duplicates, not ones with renamed variables throughout. Posts as **Duplicate Bot**.
+
+### Go, Python, PHP, Java, Kotlin, Ruby, and JavaScript lint rules
+
+| Language | Tool | Rules |
+|---|---|---|
+| Go | `golangci-lint` | `unqueryvet` (possible SQL injection via `SELECT *`, red), `ineffassign`, `predeclared`, `misspell` (yellow) |
+| Python | `Pylint` | `eval-used`, `exec-used` (arbitrary code execution risk, red), `unused-variable` (yellow) |
+| PHP | `PHP_CodeSniffer` + `phpcs-security-audit` | Full security-audit standard: SQL injection, `eval()`/`exec()`, remote file inclusion, weak crypto, and more — each finding's red/yellow severity comes from the tool's own classification |
+| Java | `PMD` | `HardCodedCryptoKey`, `InsecureCryptoIv` (red); `EmptyCatchBlock`, `UnusedLocalVariable` (yellow) |
+| Kotlin | `detekt` | `EmptyCatchBlock`, `UnusedPrivateProperty` (yellow) — smaller than the others since detekt ships no built-in security ruleset, and its type-resolution-dependent rules don't work without a real build classpath |
+| Ruby | `RuboCop` | Whole `Security` department — `Eval`, `Open`, `JSONLoad`, `MarshalLoad`, `YAMLLoad`, `IoMethods`, `CompoundHash` (red); `UselessAssignment` (yellow) |
+| JavaScript | `ESLint` | `no-eval`, `no-implied-eval` (red); `no-unused-vars`, `no-var`, `eqeqeq` (yellow) — run against our own bundled config, never the target repository's |
+
+`LINT_RUNNER_TOKEN` (optional but recommended) authenticates requests to the `lint-runner` container the same way `SYMBOL_INDEXER_TOKEN` authenticates the symbol indexer — see `.env.example`.
+
+## Semantic Search (Standard+)
+
+Natural-language code search ("where do we handle JWT tokens") — an upgrade to ⌘K/Ctrl+K search, not a replacement for Find Usages/Go to Declaration.
+
+Configure under **Settings → Semantic Search**: point it at a self-hosted **Ollama** instance (or any Ollama-compatible `/api/embeddings` endpoint) and pick an embedding model (default `mxbai-embed-large`, must already be pulled — `ollama pull mxbai-embed-large`). No code ever leaves your infrastructure; the URL is SSRF-validated the same way as other admin-configured provider URLs. Off by default until configured.
+
+Every function/method-sized definition the tree-sitter indexer already extracts gets embedded after each push (async, so a slow embeddings API never blocks push processing). Search results rank by cosine similarity — computed in Ruby against the existing `symbol_definitions` table, no pgvector extension or separate vector database required. Runs across every branch that's been embedded for a repository, not just its default branch.
+
 ## Global Search (Cmd+K)
 
 Press **⌘K** (Mac) or **Ctrl+K** (Windows/Linux) anywhere to open a search overlay. Searches repositories by name, reviews by title or CR number, and commits by SHA prefix. Navigate results with arrow keys, confirm with Enter, close with Esc.

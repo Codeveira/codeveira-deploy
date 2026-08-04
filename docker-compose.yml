@@ -71,6 +71,8 @@ services:
       SMTP_FROM: ${SMTP_FROM}
       SYMBOL_INDEXER_URL: http://indexer:8090
       SYMBOL_INDEXER_TOKEN: ${SYMBOL_INDEXER_TOKEN:-}
+      LINT_RUNNER_URL: http://lint-runner:8091
+      LINT_RUNNER_TOKEN: ${LINT_RUNNER_TOKEN:-}
     depends_on:
       db:
         condition: service_healthy
@@ -95,6 +97,17 @@ services:
     cpus: ${INDEXER_CPUS:-1.0}
     restart: unless-stopped
 
+  lint-runner:
+    image: ghcr.io/codeveira/codeveira-lint-runner:${IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      LINT_RUNNER_PORT: 8091
+      MAX_FILE_SIZE_BYTES: "2000000"
+      LINT_RUNNER_TOKEN: ${LINT_RUNNER_TOKEN:-}
+    mem_limit: ${LINT_RUNNER_MEM_LIMIT:-768m}
+    cpus: ${LINT_RUNNER_CPUS:-1.0}
+    restart: unless-stopped
+
   sidekiq:
     image: ghcr.io/codeveira/codeveira:${IMAGE_TAG:-latest}
     pull_policy: always
@@ -116,12 +129,16 @@ services:
       SMTP_FROM: ${SMTP_FROM}
       SYMBOL_INDEXER_URL: http://indexer:8090
       SYMBOL_INDEXER_TOKEN: ${SYMBOL_INDEXER_TOKEN:-}
+      LINT_RUNNER_URL: http://lint-runner:8091
+      LINT_RUNNER_TOKEN: ${LINT_RUNNER_TOKEN:-}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
       indexer:
+        condition: service_started
+      lint-runner:
         condition: service_started
     volumes:
       - backup_data:/backups
