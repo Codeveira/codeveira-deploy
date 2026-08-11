@@ -212,6 +212,43 @@ services:
       - semantic_analysis_py_net
     restart: unless-stopped
 
+  # Java sibling of the above three — drives Eclipse JDT Language Server
+  # (jdtls) over an untrusted repo's own `mvn dependency:resolve` instead of
+  # `go mod download`/`npm ci --ignore-scripts`/`pip install`. Maven-only
+  # scope: gated on a `pom.xml` at the workspace root, Gradle
+  # (`build.gradle`/`build.gradle.kts`, which are executable Groovy/Kotlin
+  # scripts evaluated just by importing the project) is out of scope for the
+  # same reason arbitrary `go generate`/npm lifecycle scripts/sdist builds
+  # are out of scope for the other three.
+  semantic-analysis-java:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-java:${IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      SEMANTIC_ANALYSIS_JAVA_TOKEN: ${SEMANTIC_ANALYSIS_JAVA_TOKEN:-}
+      HTTP_PROXY: http://semantic-analysis-java-proxy:8888
+      HTTPS_PROXY: http://semantic-analysis-java-proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+    networks:
+      - semantic_analysis_java_net
+    depends_on:
+      - semantic-analysis-java-proxy
+    mem_limit: ${SEMANTIC_ANALYSIS_JAVA_MEM_LIMIT:-1536m}
+    cpus: ${SEMANTIC_ANALYSIS_JAVA_CPUS:-1.5}
+    restart: unless-stopped
+
+  # Egress allow list for `semantic-analysis-java`'s sandboxed
+  # `mvn dependency:resolve` step: Maven Central only (repo1.maven.org and
+  # repo.maven.apache.org — the default central mirror moved between these
+  # around Maven 3.8, both still see real traffic). A separate proxy from
+  # the other three on purpose, same reasoning as above.
+  semantic-analysis-java-proxy:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-java-proxy:${IMAGE_TAG:-latest}
+    pull_policy: always
+    networks:
+      - default
+      - semantic_analysis_java_net
+    restart: unless-stopped
+
   sidekiq:
     image: ghcr.io/codeveira/codeveira:${IMAGE_TAG:-latest}
     pull_policy: always
@@ -241,11 +278,14 @@ services:
       SEMANTIC_ANALYSIS_TS_TOKEN: ${SEMANTIC_ANALYSIS_TS_TOKEN:-}
       SEMANTIC_ANALYSIS_PY_URL: http://semantic-analysis-py:8094
       SEMANTIC_ANALYSIS_PY_TOKEN: ${SEMANTIC_ANALYSIS_PY_TOKEN:-}
+      SEMANTIC_ANALYSIS_JAVA_URL: http://semantic-analysis-java:8095
+      SEMANTIC_ANALYSIS_JAVA_TOKEN: ${SEMANTIC_ANALYSIS_JAVA_TOKEN:-}
     networks:
       - default
       - semantic_analysis_net
       - semantic_analysis_ts_net
       - semantic_analysis_py_net
+      - semantic_analysis_java_net
     depends_on:
       db:
         condition: service_healthy
@@ -260,6 +300,8 @@ services:
       semantic-analysis-ts:
         condition: service_started
       semantic-analysis-py:
+        condition: service_started
+      semantic-analysis-java:
         condition: service_started
     volumes:
       - backup_data:/backups
@@ -315,6 +357,9 @@ networks:
     internal: true
   # Same isolation again, scoped to semantic-analysis-py and its own proxy.
   semantic_analysis_py_net:
+    internal: true
+  # Same isolation again, scoped to semantic-analysis-java and its own proxy.
+  semantic_analysis_java_net:
     internal: true
 
 volumes:
