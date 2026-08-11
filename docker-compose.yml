@@ -355,6 +355,41 @@ services:
       - semantic_analysis_csharp_net
     restart: unless-stopped
 
+  # Ruby via Shopify's ruby-lsp + RuboCop (both MIT). No mature Ruby LSP does
+  # real compiler-grade type-checking against untyped Ruby, so diagnostics
+  # here are RuboCop's lint/style findings, not type errors — disclosed the
+  # same way as PHP's diagnostics-only caveat. ruby-lsp isn't pre-installed
+  # in the image: this driver writes its own composed Gemfile per analysis
+  # run and `bundle install`s it fresh into the workspace every time, so a
+  # RubyGems fetch happens on every run. Like NuGet/Maven Central/PyPI, a
+  # single-host egress allow list (rubygems.org) covers it.
+  semantic-analysis-ruby:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-ruby:${IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      SEMANTIC_ANALYSIS_RUBY_TOKEN: ${SEMANTIC_ANALYSIS_RUBY_TOKEN:-}
+      HTTP_PROXY: http://semantic-analysis-ruby-proxy:8888
+      HTTPS_PROXY: http://semantic-analysis-ruby-proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+    networks:
+      - semantic_analysis_ruby_net
+    depends_on:
+      - semantic-analysis-ruby-proxy
+    mem_limit: ${SEMANTIC_ANALYSIS_RUBY_MEM_LIMIT:-1536m}
+    cpus: ${SEMANTIC_ANALYSIS_RUBY_CPUS:-1.5}
+    restart: unless-stopped
+
+  # Egress allow list for `semantic-analysis-ruby`'s `bundle install`:
+  # rubygems.org serves both package metadata and package (.gem) content, so
+  # a single host covers it.
+  semantic-analysis-ruby-proxy:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-ruby-proxy:${IMAGE_TAG:-latest}
+    pull_policy: always
+    networks:
+      - default
+      - semantic_analysis_ruby_net
+    restart: unless-stopped
+
   sidekiq:
     image: ghcr.io/codeveira/codeveira:${IMAGE_TAG:-latest}
     pull_policy: always
@@ -392,6 +427,8 @@ services:
       SEMANTIC_ANALYSIS_PHP_TOKEN: ${SEMANTIC_ANALYSIS_PHP_TOKEN:-}
       SEMANTIC_ANALYSIS_CSHARP_URL: http://semantic-analysis-csharp:8098
       SEMANTIC_ANALYSIS_CSHARP_TOKEN: ${SEMANTIC_ANALYSIS_CSHARP_TOKEN:-}
+      SEMANTIC_ANALYSIS_RUBY_URL: http://semantic-analysis-ruby:8099
+      SEMANTIC_ANALYSIS_RUBY_TOKEN: ${SEMANTIC_ANALYSIS_RUBY_TOKEN:-}
     networks:
       - default
       - semantic_analysis_net
@@ -401,6 +438,7 @@ services:
       - semantic_analysis_kt_net
       - semantic_analysis_php_net
       - semantic_analysis_csharp_net
+      - semantic_analysis_ruby_net
     depends_on:
       db:
         condition: service_healthy
@@ -423,6 +461,8 @@ services:
       semantic-analysis-php:
         condition: service_started
       semantic-analysis-csharp:
+        condition: service_started
+      semantic-analysis-ruby:
         condition: service_started
     volumes:
       - backup_data:/backups
@@ -490,6 +530,9 @@ networks:
     internal: true
   # Same isolation again, scoped to semantic-analysis-csharp and its own proxy.
   semantic_analysis_csharp_net:
+    internal: true
+  # Same isolation again, scoped to semantic-analysis-ruby and its own proxy.
+  semantic_analysis_ruby_net:
     internal: true
 
 volumes:
