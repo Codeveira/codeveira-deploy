@@ -323,6 +323,38 @@ services:
       - semantic_analysis_php_net
     restart: unless-stopped
 
+  # C# via OmniSharp-Roslyn (MIT). Unlike PHP, OmniSharp implements
+  # textDocument/documentSymbol, so this language gets both definitions and
+  # diagnostics. NuGet (unlike Packagist) serves both package metadata and
+  # package content from the same host, so this is back to a single-host
+  # egress allow list.
+  semantic-analysis-csharp:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-csharp:${IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      SEMANTIC_ANALYSIS_CSHARP_TOKEN: ${SEMANTIC_ANALYSIS_CSHARP_TOKEN:-}
+      HTTP_PROXY: http://semantic-analysis-csharp-proxy:8888
+      HTTPS_PROXY: http://semantic-analysis-csharp-proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+    networks:
+      - semantic_analysis_csharp_net
+    depends_on:
+      - semantic-analysis-csharp-proxy
+    mem_limit: ${SEMANTIC_ANALYSIS_CSHARP_MEM_LIMIT:-1536m}
+    cpus: ${SEMANTIC_ANALYSIS_CSHARP_CPUS:-1.5}
+    restart: unless-stopped
+
+  # Egress allow list for `semantic-analysis-csharp`'s sandboxed
+  # `dotnet restore`/OmniSharp NuGet resolution: api.nuget.org serves both
+  # package metadata and package content, so a single host covers it.
+  semantic-analysis-csharp-proxy:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-csharp-proxy:${IMAGE_TAG:-latest}
+    pull_policy: always
+    networks:
+      - default
+      - semantic_analysis_csharp_net
+    restart: unless-stopped
+
   sidekiq:
     image: ghcr.io/codeveira/codeveira:${IMAGE_TAG:-latest}
     pull_policy: always
@@ -358,6 +390,8 @@ services:
       SEMANTIC_ANALYSIS_KT_TOKEN: ${SEMANTIC_ANALYSIS_KT_TOKEN:-}
       SEMANTIC_ANALYSIS_PHP_URL: http://semantic-analysis-php:8097
       SEMANTIC_ANALYSIS_PHP_TOKEN: ${SEMANTIC_ANALYSIS_PHP_TOKEN:-}
+      SEMANTIC_ANALYSIS_CSHARP_URL: http://semantic-analysis-csharp:8098
+      SEMANTIC_ANALYSIS_CSHARP_TOKEN: ${SEMANTIC_ANALYSIS_CSHARP_TOKEN:-}
     networks:
       - default
       - semantic_analysis_net
@@ -366,6 +400,7 @@ services:
       - semantic_analysis_java_net
       - semantic_analysis_kt_net
       - semantic_analysis_php_net
+      - semantic_analysis_csharp_net
     depends_on:
       db:
         condition: service_healthy
@@ -386,6 +421,8 @@ services:
       semantic-analysis-kt:
         condition: service_started
       semantic-analysis-php:
+        condition: service_started
+      semantic-analysis-csharp:
         condition: service_started
     volumes:
       - backup_data:/backups
@@ -450,6 +487,9 @@ networks:
     internal: true
   # Same isolation again, scoped to semantic-analysis-php and its own proxy.
   semantic_analysis_php_net:
+    internal: true
+  # Same isolation again, scoped to semantic-analysis-csharp and its own proxy.
+  semantic_analysis_csharp_net:
     internal: true
 
 volumes:
