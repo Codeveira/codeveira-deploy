@@ -249,6 +249,39 @@ services:
       - semantic_analysis_java_net
     restart: unless-stopped
 
+  # Kotlin sibling of the above four — drives the MIT-licensed
+  # fwcd/kotlin-language-server over the same Maven-only trust boundary as
+  # Java (gated on `pom.xml`, Gradle out of scope). The language server
+  # resolves its own Maven classpath internally (`mvn dependency:list`/
+  # `dependency:sources`, both standalone goals), so this driver needs no
+  # separate dependency-resolution step of its own — just `mvn` on PATH and
+  # a proxied `~/.m2/settings.xml`, same as Java.
+  semantic-analysis-kt:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-kt:${IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      SEMANTIC_ANALYSIS_KT_TOKEN: ${SEMANTIC_ANALYSIS_KT_TOKEN:-}
+      HTTP_PROXY: http://semantic-analysis-kt-proxy:8888
+      HTTPS_PROXY: http://semantic-analysis-kt-proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+    networks:
+      - semantic_analysis_kt_net
+    depends_on:
+      - semantic-analysis-kt-proxy
+    mem_limit: ${SEMANTIC_ANALYSIS_KT_MEM_LIMIT:-1536m}
+    cpus: ${SEMANTIC_ANALYSIS_KT_CPUS:-1.5}
+    restart: unless-stopped
+
+  # Egress allow list for `semantic-analysis-kt`'s sandboxed Maven
+  # resolution: Maven Central only, same two hostnames as Java's proxy.
+  semantic-analysis-kt-proxy:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-kt-proxy:${IMAGE_TAG:-latest}
+    pull_policy: always
+    networks:
+      - default
+      - semantic_analysis_kt_net
+    restart: unless-stopped
+
   sidekiq:
     image: ghcr.io/codeveira/codeveira:${IMAGE_TAG:-latest}
     pull_policy: always
@@ -280,12 +313,15 @@ services:
       SEMANTIC_ANALYSIS_PY_TOKEN: ${SEMANTIC_ANALYSIS_PY_TOKEN:-}
       SEMANTIC_ANALYSIS_JAVA_URL: http://semantic-analysis-java:8095
       SEMANTIC_ANALYSIS_JAVA_TOKEN: ${SEMANTIC_ANALYSIS_JAVA_TOKEN:-}
+      SEMANTIC_ANALYSIS_KT_URL: http://semantic-analysis-kt:8096
+      SEMANTIC_ANALYSIS_KT_TOKEN: ${SEMANTIC_ANALYSIS_KT_TOKEN:-}
     networks:
       - default
       - semantic_analysis_net
       - semantic_analysis_ts_net
       - semantic_analysis_py_net
       - semantic_analysis_java_net
+      - semantic_analysis_kt_net
     depends_on:
       db:
         condition: service_healthy
@@ -302,6 +338,8 @@ services:
       semantic-analysis-py:
         condition: service_started
       semantic-analysis-java:
+        condition: service_started
+      semantic-analysis-kt:
         condition: service_started
     volumes:
       - backup_data:/backups
@@ -360,6 +398,9 @@ networks:
     internal: true
   # Same isolation again, scoped to semantic-analysis-java and its own proxy.
   semantic_analysis_java_net:
+    internal: true
+  # Same isolation again, scoped to semantic-analysis-kt and its own proxy.
+  semantic_analysis_kt_net:
     internal: true
 
 volumes:
