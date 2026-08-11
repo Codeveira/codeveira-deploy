@@ -111,6 +111,107 @@ services:
     cpus: ${LINT_RUNNER_CPUS:-1.0}
     restart: unless-stopped
 
+  # Enterprise-only, opt-in per repository (Repository#semantic_analysis_enabled).
+  # Unlike indexer/lint-runner, this runs `go mod download` against a real,
+  # untrusted target repo's go.mod — so it gets no direct network route at
+  # all (only membership in semantic_analysis_net, which is `internal: true`)
+  # and can only reach the world through semantic-analysis-proxy's allow list.
+  semantic-analysis:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis:${IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      SEMANTIC_ANALYSIS_TOKEN: ${SEMANTIC_ANALYSIS_TOKEN:-}
+      HTTP_PROXY: http://semantic-analysis-proxy:8888
+      HTTPS_PROXY: http://semantic-analysis-proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+    networks:
+      - semantic_analysis_net
+    depends_on:
+      - semantic-analysis-proxy
+    mem_limit: ${SEMANTIC_ANALYSIS_MEM_LIMIT:-1536m}
+    cpus: ${SEMANTIC_ANALYSIS_CPUS:-1.5}
+    restart: unless-stopped
+
+  # Egress allow list for `semantic-analysis`'s sandboxed `go mod download`
+  # step: proxy.golang.org / sum.golang.org / storage.googleapis.com only.
+  # Dual-homed on purpose — the default network for its own real uplink to
+  # the module proxy, plus semantic_analysis_net so semantic-analysis (which
+  # has no other route out) can reach it.
+  semantic-analysis-proxy:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-proxy:${IMAGE_TAG:-latest}
+    pull_policy: always
+    networks:
+      - default
+      - semantic_analysis_net
+    restart: unless-stopped
+
+  # TypeScript sibling of `semantic-analysis` — same shape and same trust
+  # boundary, but drives `typescript-language-server` over an untrusted
+  # repo's own `npm ci --ignore-scripts` instead of `go mod download`.
+  semantic-analysis-ts:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-ts:${IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      SEMANTIC_ANALYSIS_TS_TOKEN: ${SEMANTIC_ANALYSIS_TS_TOKEN:-}
+      HTTP_PROXY: http://semantic-analysis-ts-proxy:8888
+      HTTPS_PROXY: http://semantic-analysis-ts-proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+    networks:
+      - semantic_analysis_ts_net
+    depends_on:
+      - semantic-analysis-ts-proxy
+    mem_limit: ${SEMANTIC_ANALYSIS_TS_MEM_LIMIT:-1536m}
+    cpus: ${SEMANTIC_ANALYSIS_TS_CPUS:-1.5}
+    restart: unless-stopped
+
+  # Egress allow list for `semantic-analysis-ts`'s sandboxed `npm ci` step:
+  # registry.npmjs.org only. A separate proxy from semantic-analysis-proxy
+  # on purpose — each sandboxed language only ever needs its own package
+  # registry, and sharing one proxy would let either sandbox's egress reach
+  # the other language's registry too.
+  semantic-analysis-ts-proxy:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-ts-proxy:${IMAGE_TAG:-latest}
+    pull_policy: always
+    networks:
+      - default
+      - semantic_analysis_ts_net
+    restart: unless-stopped
+
+  # Python sibling of `semantic-analysis`/`semantic-analysis-ts` — same
+  # shape and same trust boundary, but drives `pyright-langserver` over an
+  # untrusted repo's own `pip install --only-binary=:all:` instead of
+  # `go mod download`/`npm ci --ignore-scripts`. pip has no --ignore-scripts
+  # equivalent for source distributions (installing an sdist always runs its
+  # setup.py/build backend); restricting to prebuilt wheels only removes
+  # that arbitrary-code-execution surface at install time.
+  semantic-analysis-py:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-py:${IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      SEMANTIC_ANALYSIS_PY_TOKEN: ${SEMANTIC_ANALYSIS_PY_TOKEN:-}
+      HTTP_PROXY: http://semantic-analysis-py-proxy:8888
+      HTTPS_PROXY: http://semantic-analysis-py-proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+    networks:
+      - semantic_analysis_py_net
+    depends_on:
+      - semantic-analysis-py-proxy
+    mem_limit: ${SEMANTIC_ANALYSIS_PY_MEM_LIMIT:-1536m}
+    cpus: ${SEMANTIC_ANALYSIS_PY_CPUS:-1.5}
+    restart: unless-stopped
+
+  # Egress allow list for `semantic-analysis-py`'s sandboxed `pip install`
+  # step: pypi.org (index API) and files.pythonhosted.org (actual wheel
+  # downloads) only. A separate proxy from the Go/TypeScript ones on
+  # purpose, same reasoning as above.
+  semantic-analysis-py-proxy:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-py-proxy:${IMAGE_TAG:-latest}
+    pull_policy: always
+    networks:
+      - default
+      - semantic_analysis_py_net
+    restart: unless-stopped
+
   sidekiq:
     image: ghcr.io/codeveira/codeveira:${IMAGE_TAG:-latest}
     pull_policy: always
@@ -134,6 +235,17 @@ services:
       SYMBOL_INDEXER_TOKEN: ${SYMBOL_INDEXER_TOKEN:-}
       LINT_RUNNER_URL: http://lint-runner:8091
       LINT_RUNNER_TOKEN: ${LINT_RUNNER_TOKEN:-}
+      SEMANTIC_ANALYSIS_URL: http://semantic-analysis:8092
+      SEMANTIC_ANALYSIS_TOKEN: ${SEMANTIC_ANALYSIS_TOKEN:-}
+      SEMANTIC_ANALYSIS_TS_URL: http://semantic-analysis-ts:8093
+      SEMANTIC_ANALYSIS_TS_TOKEN: ${SEMANTIC_ANALYSIS_TS_TOKEN:-}
+      SEMANTIC_ANALYSIS_PY_URL: http://semantic-analysis-py:8094
+      SEMANTIC_ANALYSIS_PY_TOKEN: ${SEMANTIC_ANALYSIS_PY_TOKEN:-}
+    networks:
+      - default
+      - semantic_analysis_net
+      - semantic_analysis_ts_net
+      - semantic_analysis_py_net
     depends_on:
       db:
         condition: service_healthy
@@ -142,6 +254,12 @@ services:
       indexer:
         condition: service_started
       lint-runner:
+        condition: service_started
+      semantic-analysis:
+        condition: service_started
+      semantic-analysis-ts:
+        condition: service_started
+      semantic-analysis-py:
         condition: service_started
     volumes:
       - backup_data:/backups
@@ -182,6 +300,22 @@ services:
       - app
       - lsp
     restart: unless-stopped
+
+networks:
+  default: {}
+  # No route out except semantic-analysis-proxy's allow list (see that
+  # service's comment above) — `internal: true` means Docker gives this
+  # network no gateway to the outside world at all.
+  semantic_analysis_net:
+    internal: true
+  # Same isolation as semantic_analysis_net, scoped to semantic-analysis-ts
+  # and its own proxy instead — kept separate so neither sandboxed
+  # language's egress can reach the other's package registry.
+  semantic_analysis_ts_net:
+    internal: true
+  # Same isolation again, scoped to semantic-analysis-py and its own proxy.
+  semantic_analysis_py_net:
+    internal: true
 
 volumes:
   db_data:
