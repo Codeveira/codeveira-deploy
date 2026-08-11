@@ -119,6 +119,8 @@ services:
   semantic-analysis:
     image: ghcr.io/codeveira/codeveira-semantic-analysis:${IMAGE_TAG:-latest}
     pull_policy: always
+    volumes:
+      - semantic_analysis_go_mod:/home/analyzer/go/pkg/mod
     environment:
       SEMANTIC_ANALYSIS_TOKEN: ${SEMANTIC_ANALYSIS_TOKEN:-}
       HTTP_PROXY: http://semantic-analysis-proxy:8888
@@ -151,6 +153,8 @@ services:
   semantic-analysis-ts:
     image: ghcr.io/codeveira/codeveira-semantic-analysis-ts:${IMAGE_TAG:-latest}
     pull_policy: always
+    volumes:
+      - semantic_analysis_ts_npm:/home/analyzer/.npm
     environment:
       SEMANTIC_ANALYSIS_TS_TOKEN: ${SEMANTIC_ANALYSIS_TS_TOKEN:-}
       HTTP_PROXY: http://semantic-analysis-ts-proxy:8888
@@ -187,6 +191,8 @@ services:
   semantic-analysis-py:
     image: ghcr.io/codeveira/codeveira-semantic-analysis-py:${IMAGE_TAG:-latest}
     pull_policy: always
+    volumes:
+      - semantic_analysis_py_pip:/home/analyzer/.cache/pip
     environment:
       SEMANTIC_ANALYSIS_PY_TOKEN: ${SEMANTIC_ANALYSIS_PY_TOKEN:-}
       HTTP_PROXY: http://semantic-analysis-py-proxy:8888
@@ -223,6 +229,8 @@ services:
   semantic-analysis-java:
     image: ghcr.io/codeveira/codeveira-semantic-analysis-java:${IMAGE_TAG:-latest}
     pull_policy: always
+    volumes:
+      - semantic_analysis_java_m2:/home/analyzer/.m2/repository
     environment:
       SEMANTIC_ANALYSIS_JAVA_TOKEN: ${SEMANTIC_ANALYSIS_JAVA_TOKEN:-}
       HTTP_PROXY: http://semantic-analysis-java-proxy:8888
@@ -259,6 +267,8 @@ services:
   semantic-analysis-kt:
     image: ghcr.io/codeveira/codeveira-semantic-analysis-kt:${IMAGE_TAG:-latest}
     pull_policy: always
+    volumes:
+      - semantic_analysis_kt_m2:/home/analyzer/.m2/repository
     environment:
       SEMANTIC_ANALYSIS_KT_TOKEN: ${SEMANTIC_ANALYSIS_KT_TOKEN:-}
       HTTP_PROXY: http://semantic-analysis-kt-proxy:8888
@@ -294,6 +304,8 @@ services:
   semantic-analysis-php:
     image: ghcr.io/codeveira/codeveira-semantic-analysis-php:${IMAGE_TAG:-latest}
     pull_policy: always
+    volumes:
+      - semantic_analysis_php_composer:/home/analyzer/.cache/composer
     environment:
       SEMANTIC_ANALYSIS_PHP_TOKEN: ${SEMANTIC_ANALYSIS_PHP_TOKEN:-}
       HTTP_PROXY: http://semantic-analysis-php-proxy:8888
@@ -331,6 +343,8 @@ services:
   semantic-analysis-csharp:
     image: ghcr.io/codeveira/codeveira-semantic-analysis-csharp:${IMAGE_TAG:-latest}
     pull_policy: always
+    volumes:
+      - semantic_analysis_csharp_nuget:/home/analyzer/.nuget/packages
     environment:
       SEMANTIC_ANALYSIS_CSHARP_TOKEN: ${SEMANTIC_ANALYSIS_CSHARP_TOKEN:-}
       HTTP_PROXY: http://semantic-analysis-csharp-proxy:8888
@@ -366,6 +380,8 @@ services:
   semantic-analysis-ruby:
     image: ghcr.io/codeveira/codeveira-semantic-analysis-ruby:${IMAGE_TAG:-latest}
     pull_policy: always
+    volumes:
+      - semantic_analysis_ruby_bundle:/home/analyzer/.cache/bundle
     environment:
       SEMANTIC_ANALYSIS_RUBY_TOKEN: ${SEMANTIC_ANALYSIS_RUBY_TOKEN:-}
       HTTP_PROXY: http://semantic-analysis-ruby-proxy:8888
@@ -543,3 +559,22 @@ volumes:
   nginx_certs:
   nginx_conf:
   acme_webroot:
+  # Per-language dependency-install caches for the semantic-analysis-*
+  # services — each package manager already caches by package name+version
+  # internally, so a persistent named volume at the existing (or newly
+  # added) cache-dir env var is enough to avoid re-downloading unchanged
+  # dependencies on every /analyze request; no custom hashing/eviction code
+  # needed. Shared across every repo this instance analyzes for that
+  # language (safe: only ever holds public package content that already
+  # passed through that language's egress-allowlist proxy, never target-repo
+  # source). No automatic eviction/size cap — grows unboundedly like any CI
+  # package cache; clear one manually with `docker volume rm` if disk usage
+  # becomes a concern.
+  semantic_analysis_go_mod:
+  semantic_analysis_ts_npm:
+  semantic_analysis_py_pip:
+  semantic_analysis_java_m2:
+  semantic_analysis_kt_m2:
+  semantic_analysis_php_composer:
+  semantic_analysis_csharp_nuget:
+  semantic_analysis_ruby_bundle:
