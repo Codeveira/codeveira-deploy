@@ -60,7 +60,7 @@ Codeveira is **free for any number of users** — no license key required (local
 | Free       | $0             | Unlimited | Core review, 1 local AI bot, email notifications, IDE diagnostics, configurable dashboard |
 | Standard   | $10/user/mo    | Unlimited | Cloud AI providers, Compare (file-to-file & full-repo diff), Slack/Teams/Email/Webhook/SMS notifications, REST API, Backup, 2FA, review watchers |
 | Extended   | $14/user/mo    | Unlimited | Multiple AI bots, Autofix, LDAP/AD, Audit log, Prometheus metrics             |
-| Enterprise | $16/user/mo    | Unlimited | All features + Upsource import + audit log export/SIEM + CI status badge      |
+| Enterprise | $16/user/mo    | Unlimited | All features + Upsource import + audit log export/SIEM + CI status badge + real semantic analysis (Go & TypeScript) |
 
 To purchase a license: **hello@codeveira.com**
 
@@ -115,6 +115,20 @@ POST to `/webhooks/ci/coverage` (multipart form: `commit_sha`, optional `pipelin
 - `go_cover` — `go tool cover` profile (Go)
 
 A summary card on the review page shows coverage percentage, lines covered/total, format, and pipeline name, with a warning if the report predates the review's current HEAD commit.
+
+## Semantic Analysis (Enterprise)
+
+Real semantic analysis: **Go via `gopls`** (Phase 1) and **TypeScript via `typescript-language-server`** (Phase 2) — pick one language per repository. A new, separate subsystem alongside the existing tree-sitter `indexer` container (Find Usages, Go to Declaration & Go to Symbol above) — not an upgrade to it. The indexer is purely syntactic name-matching; this runs the real language server, so its diagnostics are actual compiler output (`go vet` for Go, `tsc`-derived for TypeScript) and its definitions are type-resolved.
+
+Off by default, opt-in per repository from the repository's **Edit** page ("Enable real semantic analysis" toggle plus a **Language** dropdown to pick Go or TypeScript), only offered when your license includes Enterprise. Once enabled, it triggers automatically on every push alongside the symbol indexer — a coalescing guard skips a new run outright (rather than queuing it) if one is already running for that repository/branch, which bounds load from triggering on every push.
+
+Rails fetches the repository archive itself (GitLab only, for now — other platforms no-op and the feature stays off for those repos) and streams it to a dedicated per-language container over the internal Docker network — `semantic-analysis` for Go, `semantic-analysis-ts` for TypeScript. The Go container runs `go mod download`, spawns `gopls`, and collects real diagnostics and type-resolved definitions before tearing itself down. The TypeScript container conditionally runs `npm ci --ignore-scripts` when a `package.json` is present (requires a `tsconfig.json` at the workspace root to run at all), spawns `typescript-language-server`, walks every `.ts`/`.tsx`/`.js`/`.jsx` file, and collects the same shape of diagnostics/definitions before tearing itself down. This is the first Codeveira feature that ever runs a target repository's own dependency-install tooling, so both containers ship with a real egress allow-list from day one, not "open egress, fast-follow": neither has a direct route to the internet at all — Go's only path out is through a dedicated `semantic-analysis-proxy` container (tinyproxy) allow-listing just `proxy.golang.org`, `sum.golang.org`, and `storage.googleapis.com`, the Go module proxy's own domain set; TypeScript's only path out is a separate `semantic-analysis-ts-proxy` container allow-listing just `registry.npmjs.org`. Neither container talks to your git host directly, and the two proxies/networks are kept fully separate rather than shared.
+
+A "Semantic Analysis" panel on the review page shows run status, definition/diagnostic counts, a staleness warning if the run's commit doesn't match the review's current HEAD, and a scrollable diagnostics list linking straight into the diff at each finding's file — the same panel regardless of which language ran.
+
+`SEMANTIC_ANALYSIS_TOKEN` (shared secret, same value on `app`/`sidekiq`/`semantic-analysis`), `SEMANTIC_ANALYSIS_MEM_LIMIT` (default `1536m`), and `SEMANTIC_ANALYSIS_CPUS` (default `1.5`) configure the Go sidecar; `SEMANTIC_ANALYSIS_TS_TOKEN`, `SEMANTIC_ANALYSIS_TS_MEM_LIMIT` (default `1536m`), and `SEMANTIC_ANALYSIS_TS_CPUS` (default `1.5`) configure the TypeScript sidecar the same way. All are configurable in `.env` — see `.env.example`.
+
+**Not yet built (a future phase):** other languages (Java, Kotlin, Python, PHP, C#, Ruby); a typed Find-Usages/Go-to-Definition upgrade (Find Usages still runs on the tree-sitter index only, for both languages); diagnostics inlined into diff hunks; non-GitLab archive fetching; yarn/pnpm lockfile support for TypeScript (npm/`package-lock.json` only today).
 
 ## Architectural Lint & Duplicate Code Detection (Standard+)
 
@@ -200,11 +214,11 @@ If you'd rather run your own reverse proxy in front of Codeveira instead (e.g. a
 
 ## Scaling & High Availability
 
-The shipped `docker-compose.yml` runs one replica of each service — enough for a single team on a single host. `app`, `sidekiq`, `lsp`, and `indexer` are stateless and safe to scale horizontally as-is:
+The shipped `docker-compose.yml` runs one replica of each service — enough for a single team on a single host. `app`, `sidekiq`, `lsp`, `indexer`, `lint-runner`, `semantic-analysis`, and `semantic-analysis-ts` are stateless and safe to scale horizontally as-is:
 
 - **`app`** — sessions use Rails' default cookie store (no server affinity needed) and the codebase makes no use of `Rails.cache`, so there's no server-local cache to desync between replicas. Put a load balancer in front of multiple `app` containers.
 - **`sidekiq`** — scale with `docker compose up -d --scale sidekiq=3`; Sidekiq is designed for multiple workers pulling from the same Redis-backed queues.
-- **`lsp` / `indexer`** — both stateless per-connection/per-request; add replicas if one becomes a bottleneck.
+- **`lsp` / `indexer` / `lint-runner` / `semantic-analysis` / `semantic-analysis-ts`** — all stateless per-connection/per-request; add replicas if one becomes a bottleneck. `semantic-analysis` and `semantic-analysis-ts` are the heaviest of the five (`go mod download`/`npm ci` plus a full LSP pass per run) — raise `SEMANTIC_ANALYSIS_MEM_LIMIT`/`SEMANTIC_ANALYSIS_CPUS` and `SEMANTIC_ANALYSIS_TS_MEM_LIMIT`/`SEMANTIC_ANALYSIS_TS_CPUS` before adding replicas. `semantic-analysis-proxy` and `semantic-analysis-ts-proxy` only ever need one replica each — they're thin egress ACLs, not a bottleneck.
 - **Real-time updates (ActionCable)** — already configured with the Redis adapter in production, so broadcasts fan out correctly across multiple `app` replicas, not just within one process.
 
 **Not HA out of the box:** `db` (PostgreSQL) and `redis` are single-node in this compose file, with no replication or automatic failover. For Postgres, point `DATABASE_URL` at an externally managed HA database (RDS Multi-AZ, Cloud SQL HA, or a self-managed Patroni cluster) instead of the bundled `db` service. Redis has a built-in HA option — see below.
