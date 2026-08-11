@@ -282,6 +282,47 @@ services:
       - semantic_analysis_kt_net
     restart: unless-stopped
 
+  # PHP sibling of the above five — drives Psalm's built-in
+  # psalm-language-server (MIT, vimeo/psalm) over `composer install
+  # --no-scripts --no-plugins --no-interaction`. Composer, unlike Maven,
+  # actually honors http_proxy/https_proxy env vars (lowercase, CLI-only),
+  # so this driver needs no proxied settings-file equivalent to Java/Kotlin's
+  # ~/.m2/settings.xml — just the env vars below, translated to lowercase for
+  # the composer subprocess. psalm-language-server does not implement
+  # textDocument/documentSymbol, so this language's definitions are always
+  # empty — diagnostics only.
+  semantic-analysis-php:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-php:${IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      SEMANTIC_ANALYSIS_PHP_TOKEN: ${SEMANTIC_ANALYSIS_PHP_TOKEN:-}
+      HTTP_PROXY: http://semantic-analysis-php-proxy:8888
+      HTTPS_PROXY: http://semantic-analysis-php-proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+    networks:
+      - semantic_analysis_php_net
+    depends_on:
+      - semantic-analysis-php-proxy
+    mem_limit: ${SEMANTIC_ANALYSIS_PHP_MEM_LIMIT:-1024m}
+    cpus: ${SEMANTIC_ANALYSIS_PHP_CPUS:-1.0}
+    restart: unless-stopped
+
+  # Egress allow list for `semantic-analysis-php`'s sandboxed Composer
+  # install: unlike every other language's single-host registry, Packagist
+  # (repo.packagist.org) serves only package metadata — actual dist zip
+  # downloads for GitHub-hosted packages (the large majority of the PHP
+  # ecosystem) come directly from codeload.github.com/api.github.com/
+  # objects.githubusercontent.com. Packages hosted on GitLab/Bitbucket/
+  # self-hosted VCS will fail dependency resolution — a known limitation,
+  # not a bug (see IDEAS.md item #2).
+  semantic-analysis-php-proxy:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-php-proxy:${IMAGE_TAG:-latest}
+    pull_policy: always
+    networks:
+      - default
+      - semantic_analysis_php_net
+    restart: unless-stopped
+
   sidekiq:
     image: ghcr.io/codeveira/codeveira:${IMAGE_TAG:-latest}
     pull_policy: always
@@ -315,6 +356,8 @@ services:
       SEMANTIC_ANALYSIS_JAVA_TOKEN: ${SEMANTIC_ANALYSIS_JAVA_TOKEN:-}
       SEMANTIC_ANALYSIS_KT_URL: http://semantic-analysis-kt:8096
       SEMANTIC_ANALYSIS_KT_TOKEN: ${SEMANTIC_ANALYSIS_KT_TOKEN:-}
+      SEMANTIC_ANALYSIS_PHP_URL: http://semantic-analysis-php:8097
+      SEMANTIC_ANALYSIS_PHP_TOKEN: ${SEMANTIC_ANALYSIS_PHP_TOKEN:-}
     networks:
       - default
       - semantic_analysis_net
@@ -322,6 +365,7 @@ services:
       - semantic_analysis_py_net
       - semantic_analysis_java_net
       - semantic_analysis_kt_net
+      - semantic_analysis_php_net
     depends_on:
       db:
         condition: service_healthy
@@ -340,6 +384,8 @@ services:
       semantic-analysis-java:
         condition: service_started
       semantic-analysis-kt:
+        condition: service_started
+      semantic-analysis-php:
         condition: service_started
     volumes:
       - backup_data:/backups
@@ -401,6 +447,9 @@ networks:
     internal: true
   # Same isolation again, scoped to semantic-analysis-kt and its own proxy.
   semantic_analysis_kt_net:
+    internal: true
+  # Same isolation again, scoped to semantic-analysis-php and its own proxy.
+  semantic_analysis_php_net:
     internal: true
 
 volumes:
