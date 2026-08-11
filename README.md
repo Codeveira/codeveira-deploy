@@ -58,7 +58,7 @@ Codeveira is **free for any number of users** — no license key required (local
 | Tier       | Price          | Users     | Key features                                                                  |
 |------------|----------------|-----------|-------------------------------------------------------------------------------|
 | Free       | $0             | Unlimited | Core review, 1 local AI bot, email notifications, IDE diagnostics, configurable dashboard |
-| Standard   | $10/user/mo    | Unlimited | Cloud AI providers, Compare (file-to-file & full-repo diff), Slack/Teams/Email/Webhook/SMS notifications, REST API, Backup, 2FA, review watchers |
+| Standard   | $10/user/mo    | Unlimited | Cloud AI providers, Compare (file-to-file & full-repo diff), Slack/Teams/Email/Webhook/SMS notifications, native Task Trackers (YouTrack/Jira/Mantis/Bugzilla), REST API, Backup, 2FA, review watchers |
 | Extended   | $14/user/mo    | Unlimited | Multiple AI bots, Autofix, LDAP/AD, Audit log, Prometheus metrics             |
 | Enterprise | $16/user/mo    | Unlimited | All features + Upsource import + audit log export/SIEM + CI status badge + real semantic analysis (Go, TypeScript, Python, Java, Kotlin, PHP, C# & Ruby) |
 
@@ -102,6 +102,12 @@ Not to be confused with the single **Global Outgoing Webhook** under Notificatio
 This is also the standardized way to connect a task tracker (Jira, YouTrack, Linear, Azure Boards, or anything else) — every payload includes `ticket_keys` (auto-extracted from the CR's title/branch, e.g. `PROJ-123`, pattern overridable per repository) and `review.url` (a direct link back to the CR), so the tracker's own automation (a Jira Automation "incoming webhook" rule, a YouTrack workflow, a Zapier/Make recipe) can match the delivery to its issue with no Codeveira-specific code on its end.
 
 Upgrading from an earlier version: any repository that already had its own webhooks configured is automatically switched to "use this repository's own outgoing webhooks" so its deliveries keep firing unchanged — the global list starts out empty until you add something to it.
+
+## Task Trackers (Standard+)
+
+**Settings → Task Trackers** (global admin) — same global-default + per-repository-override shape as Outgoing Webhooks above, but instead of just sending data out, it actually drives the tracker: transitions the ticket's status and (optionally) posts a comment back, with zero receiving script required on the tracker's side. Supports **YouTrack**, **Jira**, **Mantis**, and **Bugzilla** — configure a base URL + API token (Jira also needs the account email for Basic Auth), then map each review lifecycle event (`review.opened/approved/rejected/closed/reopened`) to a target ticket status. A repository only needs its own configuration if it syncs with a different tracker instance than the rest of the install: tick **"Use this repository's own task trackers"** on the repository's Edit page, and its own **Task Trackers** tab takes over completely.
+
+Mantis and Bugzilla key issues by a bare number, not `PROJECT-123`-style keys — set a matching **ticket key pattern** override on the repository (same setting used for Outgoing Webhooks' `ticket_keys`) so Codeveira can find them in review titles/branches. Use the **Test Connection** button to verify credentials before relying on it. Sync failures are logged, never block the review action that triggered them.
 
 ## Code Coverage (Enterprise)
 
