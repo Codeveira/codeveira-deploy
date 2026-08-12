@@ -5,3 +5,11 @@
 # Database backups written by DatabaseBackupJob
 /backup/*
 !/backup/.gitkeep
+
+# Postgres/Redis data directories (bind-mounted, see docker-compose.yml).
+# No .gitkeep here on purpose: Postgres' initdb refuses to initialize a data
+# directory that contains any file at all, including a lone dotfile — a
+# placeholder would break `docker compose up` on a fresh checkout. Docker
+# auto-creates the host directory on first mount, which is all that's needed.
+/pgdata/
+/redis/

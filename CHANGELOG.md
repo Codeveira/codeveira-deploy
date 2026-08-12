@@ -94,6 +94,14 @@ All notable changes to Codeveira are documented here.
 
 ### Changed
 - **Database backups now write to a host-bind-mounted `./backup` directory instead of the `backup_data` Docker named volume** — dump files are directly visible/browsable on the host without `docker compose exec`/`docker volume inspect`, are trivial to point an external rsync/restic/cloud-sync job at, and — unlike a named volume — survive `docker compose down -v`, so they're no longer at risk of being wiped alongside the live database in the same command. **Action required on upgrade:** the `backup_data` volume isn't deleted automatically and your existing dumps stay in it; copy them into the new `./backup` directory before removing the old volume, e.g. `docker run --rm -v <project>_backup_data:/from -v "$(pwd)/backup":/to alpine cp -a /from/. /to/` (run once, then `docker compose up -d app sidekiq` to pick up the new mount, then optionally `docker volume rm <project>_backup_data`). Nothing to do if you already customized `BACKUP_DIR`/the volume mapping to a bind mount yourself, per the earlier docs.
+- **PostgreSQL and Redis data now live in host-bind-mounted `./pgdata` and `./redis` directories instead of the `db_data`/`redis_data` Docker named volumes** — same reasoning as the backup change above, one level more important: unlike backups, `db_data`/`redis_data` held the *only* live copy, so `docker compose down -v` (including via this project's own documented `TESTSERVICE` demo-data-reset instructions) could previously destroy the live database itself, not just a safety net. **Action required on upgrade — this touches your live database, read before running:**
+  1. Stop the app so nothing writes during the migration: `docker compose stop app sidekiq`
+  2. Stop `db` and `redis` themselves — required, copying a running Postgres data directory can silently produce a corrupt copy: `docker compose stop db redis`
+  3. Copy each old volume into its new directory: `docker run --rm -v <project>_db_data:/from -v "$(pwd)/pgdata":/to alpine cp -a /from/. /to/` and `docker run --rm -v <project>_redis_data:/from -v "$(pwd)/redis":/to alpine cp -a /from/. /to/`
+  4. `docker compose up -d` to pick up the new mounts, then confirm your existing data is there (log in, check a known review exists) before doing anything else
+  5. Only once you've confirmed the data is intact, optionally remove the old volumes: `docker volume rm <project>_db_data <project>_redis_data`
+
+  Nothing to do on a fresh install — `./pgdata` and `./redis` are created empty and initialized normally on first boot.
 - **Upsource import wizard** moved from Standard to **Enterprise** tier
 
 ### Changed

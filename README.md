@@ -267,7 +267,7 @@ Prometheus itself is exposed at `:9090` for ad-hoc queries. Loki/Promtail have n
 
 There's no scheduled backup job for Redis, unlike the [Backup & Restore](https://codeveira.com/docs/settings/) feature for PostgreSQL — by design, not an oversight. Everything durable (reviews, comments, users, the symbol index, audit log) lives in Postgres; Redis only holds Sidekiq's job queues and ActionCable's pub/sub, which are transient in-flight state.
 
-It's already persisted: the `redis_data` volume survives container restarts, and Redis's default RDB snapshot policy is active out of the box. AOF is off by default, so a hard crash can lose up to the last snapshot window — in practice a handful of in-flight jobs (an unprocessed webhook, an AI review run, a symbol-indexing job for the last few commits), never committed application data.
+It's already persisted: the `./redis` host directory (bind-mounted, not a Docker-managed volume — same as `./pgdata` and `./backup`, so `docker compose down -v` can't take it out) survives container restarts, and Redis's default RDB snapshot policy is active out of the box. AOF is off by default, so a hard crash can lose up to the last snapshot window — in practice a handful of in-flight jobs (an unprocessed webhook, an AI review run, a symbol-indexing job for the last few commits), never committed application data.
 
 If you want a point-in-time snapshot anyway (e.g. before a risky upgrade):
 
