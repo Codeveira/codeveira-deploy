@@ -1,3 +1,7 @@
 # Secrets and local config
 .env
 /monitoring/prometheus_token
+
+# Database backups written by DatabaseBackupJob
+/backup/*
+!/backup/.gitkeep

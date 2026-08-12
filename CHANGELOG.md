@@ -93,6 +93,7 @@ All notable changes to Codeveira are documented here.
 - **Diff stats pre-computed** — `additions_count` / `deletions_count` columns added to `commits` table; stats are computed once on save and read from DB instead of being parsed from raw diff text on every request; dashboard and review list performance improved significantly for large repositories
 
 ### Changed
+- **Database backups now write to a host-bind-mounted `./backup` directory instead of the `backup_data` Docker named volume** — dump files are directly visible/browsable on the host without `docker compose exec`/`docker volume inspect`, are trivial to point an external rsync/restic/cloud-sync job at, and — unlike a named volume — survive `docker compose down -v`, so they're no longer at risk of being wiped alongside the live database in the same command. **Action required on upgrade:** the `backup_data` volume isn't deleted automatically and your existing dumps stay in it; copy them into the new `./backup` directory before removing the old volume, e.g. `docker run --rm -v <project>_backup_data:/from -v "$(pwd)/backup":/to alpine cp -a /from/. /to/` (run once, then `docker compose up -d app sidekiq` to pick up the new mount, then optionally `docker volume rm <project>_backup_data`). Nothing to do if you already customized `BACKUP_DIR`/the volume mapping to a bind mount yourself, per the earlier docs.
 - **Upsource import wizard** moved from Standard to **Enterprise** tier
 
 ### Changed

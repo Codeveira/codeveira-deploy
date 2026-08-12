@@ -83,7 +83,7 @@ services:
         condition: service_healthy
     volumes:
       - app_storage:/app/storage
-      - backup_data:/backups
+      - ./backup:/backups
       - nginx_certs:/etc/letsencrypt
       - nginx_conf:/etc/nginx/conf.d
       - acme_webroot:/var/www/acme-challenge
@@ -481,7 +481,7 @@ services:
       semantic-analysis-ruby:
         condition: service_started
     volumes:
-      - backup_data:/backups
+      - ./backup:/backups
       - nginx_certs:/etc/letsencrypt
       - nginx_conf:/etc/nginx/conf.d
       - acme_webroot:/var/www/acme-challenge
@@ -555,7 +555,6 @@ volumes:
   db_data:
   redis_data:
   app_storage:
-  backup_data:
   nginx_certs:
   nginx_conf:
   acme_webroot:
