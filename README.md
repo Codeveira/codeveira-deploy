@@ -123,6 +123,12 @@ POST to `/webhooks/ci/coverage` (multipart form: `commit_sha`, optional `pipelin
 
 A summary card on the review page shows coverage percentage, lines covered/total, format, and pipeline name, with a warning if the report predates the review's current HEAD commit.
 
+## SAST Findings (Enterprise)
+
+Generic ingestion of **SARIF 2.1.0** reports — the JSON standard emitted by Semgrep, CodeQL, Bandit, Brakeman, Trivy, Checkov, and effectively every modern SAST/security scanner, so one integration covers the whole ecosystem instead of a bespoke adapter per vendor.
+
+POST to `/webhooks/ci/sast` (multipart form: `commit_sha`, optional `pipeline_name`, and the `report` file) using the same token as the CI status/coverage webhooks, configured under **Settings → CI Integration**. Findings are posted as inline review comments from a dedicated **sast-bot** account at the exact file/line SARIF reports (🔴 error / 🟡 warning / 🔵 note), deduped so re-uploading the same report doesn't repost. A summary card on the review page shows total findings by severity, tool name, and pipeline name, with a staleness warning if the report predates the review's current HEAD commit.
+
 ## Semantic Analysis (Enterprise)
 
 Real semantic analysis: **Go via `gopls`** (Phase 1), **TypeScript via `typescript-language-server`**, **Python via `pyright`**, **Java via Eclipse JDT Language Server (`jdtls`)**, **Kotlin via `kotlin-language-server`**, **PHP via Psalm's `psalm-language-server`**, **C# via OmniSharp-Roslyn**, and **Ruby via `ruby-lsp` + RuboCop** (Phase 2) — pick one language per repository; all eight originally-scoped languages now ship. A new, separate subsystem alongside the existing tree-sitter `indexer` container (Find Usages, Go to Declaration & Go to Symbol above) — not an upgrade to it. The indexer is purely syntactic name-matching; this runs the real language server, so its diagnostics are actual compiler output (`go vet` for Go, `tsc`-derived for TypeScript, `pyright`-derived for Python, `jdtls`-derived for Java, `kotlin-language-server`-derived for Kotlin, Psalm-derived for PHP, OmniSharp-derived for C#, RuboCop-derived for Ruby) and its definitions are type-resolved (PHP is the one diagnostics-only exception: `psalm-language-server` doesn't implement `documentSymbol`, so it never returns definitions; C# and Ruby both get real definitions and diagnostics, though Ruby's diagnostics are RuboCop's lint/style findings rather than compiler type errors, since no mature Ruby LSP does real type-checking against untyped Ruby).
