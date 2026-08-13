@@ -58,7 +58,7 @@ Codeveira is **free for any number of users** — no license key required (local
 | Tier       | Price          | Users     | Key features                                                                  |
 |------------|----------------|-----------|-------------------------------------------------------------------------------|
 | Free       | $0             | Unlimited | Core review, 1 local AI bot, email notifications, IDE diagnostics, configurable dashboard |
-| Standard   | $10/user/mo    | Unlimited | Cloud AI providers, Compare (file-to-file & full-repo diff), Slack/Teams/Email/Webhook/SMS notifications, native Task Trackers (YouTrack/Jira/Mantis/Bugzilla), REST API, Backup, 2FA, review watchers |
+| Standard   | $10/user/mo    | Unlimited | Cloud AI providers, Compare (file-to-file & full-repo diff), Teams (cross-repo rollups for leads), Slack/Teams/Email/Webhook/SMS notifications, native Task Trackers (YouTrack/Jira/Mantis/Bugzilla), REST API, Backup, 2FA, review watchers |
 | Extended   | $14/user/mo    | Unlimited | Multiple AI bots, Autofix, LDAP/AD, Audit log, Prometheus metrics             |
 | Enterprise | $16/user/mo    | Unlimited | All features + Upsource import + audit log export/SIEM + CI status badge + real semantic analysis (Go, TypeScript, Python, Java, Kotlin, PHP, C# & Ruby) |
 
@@ -108,6 +108,12 @@ Upgrading from an earlier version: any repository that already had its own webho
 **Settings → Task Trackers** (global admin) — same global-default + per-repository-override shape as Outgoing Webhooks above, but instead of just sending data out, it actually drives the tracker: transitions the ticket's status and (optionally) posts a comment back, with zero receiving script required on the tracker's side. Supports **YouTrack**, **Jira**, **Mantis**, and **Bugzilla** — configure a base URL + API token (Jira also needs the account email for Basic Auth), then map each review lifecycle event (`review.opened/approved/rejected/closed/reopened`) to a target ticket status. A repository only needs its own configuration if it syncs with a different tracker instance than the rest of the install: tick **"Use this repository's own task trackers"** on the repository's Edit page, and its own **Task Trackers** tab takes over completely.
 
 Mantis and Bugzilla key issues by a bare number, not `PROJECT-123`-style keys — set a matching **ticket key pattern** override on the repository (same setting used for Outgoing Webhooks' `ticket_keys`) so Codeveira can find them in review titles/branches. Use the **Test Connection** button to verify credentials before relying on it. Sync failures are logged, never block the review action that triggered them.
+
+## Teams (Standard)
+
+A `Team` groups users across repositories, so a lead can ask "what does my team own that's stuck?" once instead of per-repository. **Settings → Teams** (global admin) creates/renames/deletes teams and manages membership one row at a time — add or remove a member, set their role to **member** or **lead** — with every change recorded in the audit log.
+
+Any team member or lead gets a **Teams** link in the top nav pointing at `/teams/:id` — no admin access required — showing that team's open/stale/needs-response reviews and pending assignments across every member's repositories, plus per-member stats (authored, approvals, comments, last active). A global admin can open any team's rollup without being a member of it.
 
 ## Code Coverage (Enterprise)
 
