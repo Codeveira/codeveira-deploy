@@ -1,0 +1,44 @@
+# Optional local-model overlay — merge on top of docker-compose.yml to run
+# a self-hosted Ollama instance alongside the app, so AI code review and
+# Semantic Search can both run without any diff or embedding ever leaving
+# your infrastructure:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.local-model.yml up -d
+#
+# One-time setup after starting: pull whatever model(s) you want to use —
+#
+#   docker compose exec ollama ollama pull llama3.1
+#   docker compose exec ollama ollama pull nomic-embed-text   # for Semantic Search
+#
+# Then point Codeveira at the service by name (no host port is published —
+# same "internal-network-only" posture as `app:3000`, see the "Domain &
+# HTTPS" section of README.md):
+#
+#   - AI reviewer bot (Settings > Users > AI bot > provider "OpenAI-compatible"):
+#       API base URL = http://ollama:11434/v1
+#   - Semantic Search (Settings > Semantic Search):
+#       Embeddings API URL = http://ollama:11434
+#
+# The service is named `ollama` on purpose — it's the exact hostname
+# Semantic Search's existing test fixtures and SsrfGuard already expect
+# (see app/services/ssrf_guard.rb), so both features work against it with
+# no extra configuration beyond the URLs above.
+#
+# GPU passthrough (optional, requires the NVIDIA Container Toolkit on the
+# host): uncomment the `deploy.resources.reservations.devices` block below.
+services:
+  ollama:
+    image: ollama/ollama:0.16.4
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+volumes:
+  ollama_data:

@@ -109,11 +109,23 @@ Upgrading from an earlier version: any repository that already had its own webho
 
 Mantis and Bugzilla key issues by a bare number, not `PROJECT-123`-style keys — set a matching **ticket key pattern** override on the repository (same setting used for Outgoing Webhooks' `ticket_keys`) so Codeveira can find them in review titles/branches. Use the **Test Connection** button to verify credentials before relying on it. Sync failures are logged, never block the review action that triggered them.
 
+## Automatic review accumulation by ticket key (Free)
+
+For teams on a strictly post-commit workflow with no PRs/MRs: push a commit whose message carries a ticket key (e.g. `PROJ-123`, same pattern as `ticket_keys` above) and Codeveira opens a review for it; push a later commit with the same key and Codeveira appends it to that same review instead of opening a duplicate — no CLI, no click, no manual step. Works on every supported platform. Reviewer sign-off resets to pending on each accumulated commit, same as manually clicking **Add commit(s)** on the review page (which still works too, for a commit that doesn't share a key with any open review). Only applies to ordinary post-commit reviews — PR mode/Gerrit reviews are already live-synced from the platform's own pull/merge request or Change, so ticket-key matching never touches them. A review migrated in via Upsource Import keeps accumulating the same way once imported.
+
 ## Teams (Standard)
 
 A `Team` groups users across repositories, so a lead can ask "what does my team own that's stuck?" once instead of per-repository. **Settings → Teams** (global admin) creates/renames/deletes teams and manages membership one row at a time — add or remove a member, set their role to **member** or **lead** — with every change recorded in the audit log.
 
 Any team member or lead gets a **Teams** link in the top nav pointing at `/teams/:id` — no admin access required — showing that team's open/stale/needs-response reviews and pending assignments across every member's repositories, plus per-member stats (authored, approvals, comments, last active). A global admin can open any team's rollup without being a member of it.
+
+## Ownership-Based Risk Scoring (Standard)
+
+Flags reviews where the author is touching files they have little or no history with — the same `file_ownership_stats` git-history index that powers reviewer suggestions, read a different way. Every review page shows a **RISK** badge (gray/amber/red) giving the percentage of the review's changed files the author has never previously committed to in this repository.
+
+Optionally, set a **merge-block threshold** on a repository's Edit page ("Ownership risk merge-block threshold", 1–100, blank = disabled). Once a review's risk score reaches the threshold, approving, closing, or merging it is blocked with an explanation banner until a global admin steps in — the same override any admin already has for the Checklist enforcement gate. Enforced identically whether the action comes from the web UI or the REST API.
+
+Requires a **Standard** license or higher.
 
 ## Pull Request Mode (Extended)
 
@@ -284,6 +296,23 @@ Grafana comes up at `:3001` (`admin` / `GRAFANA_ADMIN_PASSWORD`) with two dashbo
 - **Nginx — Connections & Security** — who's connecting to the instance and any failed/suspicious requests by IP (a spike of 404s/401s from one address is what a scan or brute-force attempt looks like here), sourced from nginx's own access log via Loki rather than a Prometheus metric — client IP is unbounded-cardinality data, so it's shipped as logs, not a label.
 
 Prometheus itself is exposed at `:9090` for ad-hoc queries. Loki/Promtail have no exposed ports — Grafana talks to them over the internal Docker network only.
+
+## Local AI model (optional)
+
+Want the AI reviewer bot and/or Semantic Search running fully offline, with no diff or embedding ever leaving your infrastructure? Merge in a self-hosted Ollama instance the same way:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local-model.yml up -d
+docker compose exec ollama ollama pull llama3.1            # chat model, for AI review
+docker compose exec ollama ollama pull nomic-embed-text    # embedding model, for Semantic Search
+```
+
+No host port is published — same internal-network-only posture as `app:3000` — reach it from inside the stack at `http://ollama:11434`. Configure:
+
+- **AI reviewer bot** (**Settings → Users → AI bot → provider "OpenAI-compatible"**): API base URL `http://ollama:11434/v1`.
+- **Semantic Search** (**Settings → Semantic Search**): Embeddings API URL `http://ollama:11434`.
+
+The service is named `ollama` on purpose — it matches what `SsrfGuard` already permits and what Semantic Search expects by default, so no extra allowlisting is needed.
 
 ## Redis Data & Backup
 
