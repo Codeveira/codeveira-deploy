@@ -17,15 +17,15 @@
 # the sentinels and go back to plain docker-compose.yml, `redis` is left
 # stuck read-only, pointed at a host that no longer exists (Sidekiq will
 # crash-loop on `READONLY You can't write against a read only replica`).
-# Before reverting, always run: docker exec <redis container> redis-cli
-# replicaof no one — confirmed with `redis-cli info replication` (role
+# Before reverting, always run: docker exec <redis container> valkey-cli
+# replicaof no one — confirmed with `valkey-cli info replication` (role
 # should read "master") — to promote it back to a standalone master first.
 services:
   redis-replica:
-    image: redis:7-alpine
-    command: redis-server --replicaof redis 6379
+    image: valkey/valkey:9-alpine
+    command: valkey-server --replicaof redis 6379
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -35,12 +35,12 @@ services:
     restart: unless-stopped
 
   sentinel-1:
-    image: redis:7-alpine
+    image: valkey/valkey:9-alpine
     volumes:
       - ./redis-sentinel/sentinel.conf.template:/etc/redis/sentinel.conf.template:ro
-    command: sh -c "cp /etc/redis/sentinel.conf.template /tmp/sentinel.conf && redis-server /tmp/sentinel.conf --sentinel"
+    command: sh -c "cp /etc/redis/sentinel.conf.template /tmp/sentinel.conf && valkey-server /tmp/sentinel.conf --sentinel"
     healthcheck:
-      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      test: ["CMD", "valkey-cli", "-p", "26379", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -50,12 +50,12 @@ services:
     restart: unless-stopped
 
   sentinel-2:
-    image: redis:7-alpine
+    image: valkey/valkey:9-alpine
     volumes:
       - ./redis-sentinel/sentinel.conf.template:/etc/redis/sentinel.conf.template:ro
-    command: sh -c "cp /etc/redis/sentinel.conf.template /tmp/sentinel.conf && redis-server /tmp/sentinel.conf --sentinel"
+    command: sh -c "cp /etc/redis/sentinel.conf.template /tmp/sentinel.conf && valkey-server /tmp/sentinel.conf --sentinel"
     healthcheck:
-      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      test: ["CMD", "valkey-cli", "-p", "26379", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -65,12 +65,12 @@ services:
     restart: unless-stopped
 
   sentinel-3:
-    image: redis:7-alpine
+    image: valkey/valkey:9-alpine
     volumes:
       - ./redis-sentinel/sentinel.conf.template:/etc/redis/sentinel.conf.template:ro
-    command: sh -c "cp /etc/redis/sentinel.conf.template /tmp/sentinel.conf && redis-server /tmp/sentinel.conf --sentinel"
+    command: sh -c "cp /etc/redis/sentinel.conf.template /tmp/sentinel.conf && valkey-server /tmp/sentinel.conf --sentinel"
     healthcheck:
-      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      test: ["CMD", "valkey-cli", "-p", "26379", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
