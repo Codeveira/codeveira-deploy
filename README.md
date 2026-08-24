@@ -1,6 +1,6 @@
 # Codeveira — Self-Hosted Code Review
 
-> Post-commit code review platform for GitLab, GitHub, Gitea, Forgejo, Bitbucket, Azure DevOps, Gerrit, and SVN.  
+> Post-commit code review platform for GitLab, GitHub, Gitea, Forgejo, Bitbucket, Azure DevOps, Gerrit, and SVN — plus Linux-kernel-style `git send-email` review with no hosted API required.  
 > The modern self-hosted alternative to JetBrains Upsource.
 
 ## Requirements
@@ -59,7 +59,7 @@ Codeveira is **free for any number of users** — no license key required (local
 |------------|----------------|-----------|-------------------------------------------------------------------------------|
 | Free       | $0             | Unlimited | Core review, 1 local AI bot, email notifications, IDE diagnostics, configurable dashboard |
 | Standard   | $10/user/mo    | Unlimited | Cloud AI providers, Compare (file-to-file & full-repo diff), Teams (cross-repo rollups for leads), Slack/Teams/Email/Webhook/SMS notifications, native Task Trackers (YouTrack/Jira/Mantis/Bugzilla), task tracker merge gate, reviewer auto-assignment by load, REST API, Backup, 2FA, review watchers, Migration Safety Analyzer, Secret Scanning, Semantic Duplicate Detection, Dead Symbol Detection |
-| Extended   | $14/user/mo    | Unlimited | Multiple AI bots, Autofix, AI suggestion suppression/learning, PR mode (GitLab/GitHub/Gitea/Forgejo/Bitbucket/Bitbucket Server/Azure DevOps/Gerrit), LDAP/AD, Audit log, Prometheus metrics |
+| Extended   | $14/user/mo    | Unlimited | Multiple AI bots, Autofix, AI suggestion suppression/learning, PR mode (GitLab/GitHub/Gitea/Forgejo/Bitbucket/Bitbucket Server/Azure DevOps/Gerrit), Email/Patch reviews (`git send-email`), LDAP/AD, Audit log, Prometheus metrics |
 | Enterprise | $16/user/mo    | Unlimited | All features + Upsource import + audit log export/SIEM + CI status badge + CI flakiness detection + CI/SAST merge gate + real semantic analysis (Go, TypeScript, Python, Java, Kotlin, PHP, C# & Ruby) + stacked diffs |
 
 To purchase a license: **hello@codeveira.com**
@@ -142,6 +142,25 @@ An opt-in alternative to the default **post-commit** review flow, for teams that
 Turn it on per-repository from **Edit → Pull Request Mode** (GitLab, GitHub, Gitea, Forgejo, Bitbucket, Bitbucket Server, Azure DevOps, or Gerrit). Then tick **"Merge request events"** (GitLab), **"Pull requests"** (GitHub/Gitea/Forgejo), **"Pull Request"** events (Bitbucket/Bitbucket Server), the pull-request service hooks (Azure DevOps), or the `patchset-created`/`change-merged`/`change-abandoned`/`change-restored` events via the Gerrit `webhooks` plugin (Gerrit) on that repository's webhook config — the same `/webhooks/<platform>` endpoint already used for pushes also carries PR/MR (or Change) lifecycle events, no new URL to configure.
 
 Once enabled, opening a PR/MR (or, on Gerrit, uploading a Change's first patch-set) creates a review that stays live: pushing new commits to the source branch (or uploading a new patch-set) syncs them in automatically, and once every required reviewer has approved, a **Merge**/**Submit** button on the review page calls the platform's own merge endpoint (GitLab "Accept MR" / GitHub "Merge PR" / Gitea and Forgejo's native pull-request merge / Bitbucket and Bitbucket Server's native merge endpoint / Azure DevOps' pull request completion API / Gerrit's `Code-Review: +2` label post followed by `submit`) — Codeveira never performs a git-level merge itself, so squash/rebase strategy (or, on Gerrit, submit requirements) and conflict handling stay under the platform's control. Closing without merging (or abandoning a Change) is tracked too. Comments, checklists, CI status, coverage, SAST findings, AI review, and notifications all work identically to post-commit reviews.
+
+Requires an **Extended** license or higher.
+
+## Email/Patch Reviews (Extended)
+
+A fourth review model, alongside post-commit, PR mode, and Gerrit: Linux-kernel-style `git format-patch` + `git send-email`. A contributor mails a patch series directly to the repository, and a maintainer reviews it by replying with a `Reviewed-by:`/`Acked-by:` trailer — no web UI round-trip required on either end. No hosted API/webhook needed for this one; it reuses the same inbound-mail setup as **Reply by Email** below.
+
+1. Set `INBOUND_EMAIL_DOMAIN`/`RAILS_INBOUND_EMAIL_PASSWORD` and configure MX/mail-server piping as described under "Reply by Email" below (`sidekiq` needs a restart after changing either var).
+2. Create a repository with source **Email/Patch** — no URL or token needed. Its patch-submission address, `patch+<token>@<INBOUND_EMAIL_DOMAIN>`, is shown on the repository's edit page.
+3. Contributors send patches to that address:
+   ```
+   git format-patch --cover-letter -3 origin/main --stdout | \
+     git send-email --to=patch+<token>@<INBOUND_EMAIL_DOMAIN> --thread --stdin
+   ```
+   The first patch (or cover letter) opens a new review; every later patch in the same `git send-email` thread is appended to it as another commit. A fresh `git send-email` thread — including a `v2` resend — always opens a brand-new, separate review.
+4. Reviewers reply from their inbox with a `Reviewed-by:`/`Acked-by:` trailer anywhere in the body to approve — the review moves to **Approved** the same way an in-app approval does, once every assigned reviewer has signed off. A reply without one of those trailers is posted as an ordinary comment.
+5. Merging is manual and out-of-band: apply the series locally with `git am`, push/merge as usual, then close the review in the web UI.
+
+Not supported for this source, by design: repository browsing (tree/blame/file history — there's no hosted repo to browse), Autofix, and any semantic-analysis feature that needs a full file (Architectural Lint, duplicate/dead-code detection).
 
 Requires an **Extended** license or higher.
 
@@ -280,6 +299,7 @@ Full documentation at **[codeveira.com/docs](https://codeveira.com/docs/)**.
 - [Azure DevOps](https://codeveira.com/docs/azure-devops-integration/)
 - [Gerrit](https://codeveira.com/docs/gerrit-integration/)
 - [SVN](https://codeveira.com/docs/svn-integration/)
+- [Email/Patch (git send-email)](https://codeveira.com/docs/email-patch-integration/)
 - [LDAP](https://codeveira.com/docs/ldap/)
 
 ## Domain & HTTPS
