@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: codereview
       POSTGRES_USER: codereview
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
     volumes:
       - ./pgdata:/var/lib/postgresql
     healthcheck:
@@ -37,15 +37,16 @@ services:
       RAILS_ENV: production
       RAILS_LOG_TO_STDOUT: "true"
       RAILS_SERVE_STATIC_FILES: "true"
-      DATABASE_URL: postgresql://codereview:${DB_PASSWORD:-secret}@db/codereview
+      DATABASE_URL: postgresql://codereview:${DB_PASSWORD:?DB_PASSWORD must be set}@db/codereview
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY_BASE: ${SECRET_KEY_BASE}
       ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY: ${ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY}
       ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY: ${ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY}
       ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT: ${ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT}
       APP_HOST: ${APP_HOST}
+      FORCE_SSL: ${FORCE_SSL:-true}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme123}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
       GITLAB_URL: ${GITLAB_URL}
       GITLAB_APP_ID: ${GITLAB_APP_ID}
       GITLAB_APP_SECRET: ${GITLAB_APP_SECRET}
@@ -60,6 +61,9 @@ services:
       BITBUCKET_SERVER_WEBHOOK_SECRET: ${BITBUCKET_SERVER_WEBHOOK_SECRET}
       AZURE_WEBHOOK_SECRET: ${AZURE_WEBHOOK_SECRET}
       GERRIT_WEBHOOK_SECRET: ${GERRIT_WEBHOOK_SECRET}
+      LSP_PROXY_SHARED_SECRET: ${LSP_PROXY_SHARED_SECRET:-}
+      INBOUND_EMAIL_DOMAIN: ${INBOUND_EMAIL_DOMAIN:-}
+      RAILS_INBOUND_EMAIL_PASSWORD: ${RAILS_INBOUND_EMAIL_PASSWORD:-}
       LDAP_HOST: ${LDAP_HOST}
       LDAP_PORT: ${LDAP_PORT:-389}
       LDAP_SSL: ${LDAP_SSL:-false}
@@ -412,7 +416,7 @@ services:
     command: bundle exec sidekiq -C config/sidekiq.yml
     environment:
       RAILS_ENV: production
-      DATABASE_URL: postgresql://codereview:${DB_PASSWORD:-secret}@db/codereview
+      DATABASE_URL: postgresql://codereview:${DB_PASSWORD:?DB_PASSWORD must be set}@db/codereview
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY_BASE: ${SECRET_KEY_BASE}
       ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY: ${ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY}
@@ -425,6 +429,8 @@ services:
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM: ${SMTP_FROM}
+      INBOUND_EMAIL_DOMAIN: ${INBOUND_EMAIL_DOMAIN:-}
+      RAILS_INBOUND_EMAIL_PASSWORD: ${RAILS_INBOUND_EMAIL_PASSWORD:-}
       SYMBOL_INDEXER_URL: http://indexer:8090
       SYMBOL_INDEXER_TOKEN: ${SYMBOL_INDEXER_TOKEN:-}
       LINT_RUNNER_URL: http://lint-runner:8091
@@ -495,6 +501,7 @@ services:
     environment:
       CODEVEIRA_URL: http://app:3000
       LSP_PORT: 7777
+      LSP_PROXY_SHARED_SECRET: ${LSP_PROXY_SHARED_SECRET:-}
     depends_on:
       - app
     restart: unless-stopped
