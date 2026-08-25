@@ -91,6 +91,15 @@ services:
       - nginx_certs:/etc/letsencrypt
       - nginx_conf:/etc/nginx/conf.d
       - acme_webroot:/var/www/acme-challenge
+    # start_period is generous because entrypoint.sh runs db:migrate before
+    # Puma starts listening — this is also what rollout.sh polls to gate a
+    # zero-downtime swap on the new container actually being ready.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/up || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
     restart: unless-stopped
 
   indexer:

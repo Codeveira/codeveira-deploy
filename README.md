@@ -41,9 +41,25 @@ docker compose up -d
 docker compose exec app rails db:migrate
 ```
 
+Or, equivalently: `make update`. `make ps` / `make logs` (`make logs SERVICE=sidekiq`) work the same way as the main repo's own Makefile.
+
 > **Upgrading from before the encryption-at-rest release?** Add `ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY`, `ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY`, and `ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT` to `.env` first (see `.env.example`) — the app won't boot without them. Existing repository tokens, AI provider keys, and similar secrets stay readable during the upgrade and get encrypted automatically when `rails db:migrate` runs.
 >
 > Also add `AZURE_WEBHOOK_SECRET`/`GERRIT_WEBHOOK_SECRET` if you use those integrations — their webhooks now require authentication (HTTP Basic Auth) where they previously accepted any request.
+
+### Zero-downtime updates
+
+The plain rollout above briefly stops `app` while it recreates. To upgrade without a gap in service, run `rollout.sh` instead:
+
+```bash
+./rollout.sh
+```
+
+Or `make rollout`.
+
+It starts a second `app` replica on the newly pulled image next to the running one, waits for it to pass its `/up` healthcheck, then removes the old replica — the bundled nginx discovers both replicas through Docker's DNS and routes around whichever one just disappeared, so there is no window with zero `app` containers up. `sidekiq` is restarted (with its normal brief pause; it isn't in the request path) only after `app` is confirmed healthy on the new image. If the new replica never turns healthy within `HEALTH_TIMEOUT_SECONDS` (default 120), it's removed and the old replica keeps serving — nothing is left half-upgraded.
+
+This needs the bundled nginx in front, since it relies on scaling `app` to two containers on the same host port 3000 internally: it does not work with `docker-compose.byo-proxy.yml`, which publishes `app:3000` directly to the host (two replicas would conflict on that port). Use the plain rollout above in that setup.
 
 ## Pinning a version
 
