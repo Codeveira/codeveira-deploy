@@ -1,0 +1,12 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: codeveira-monitoring-dashboard
+  labels:
+    {{- include "codeveira-common.labels" . | nindent 4 }}
+    {{ .Values.grafana.dashboardLabel }}: {{ .Values.grafana.dashboardLabelValue | quote }}
+data:
+  codeveira.json: |-
+    {{- .Files.Get "files/codeveira-dashboard.json" | replace "codeveira-prometheus" .Values.grafana.datasourceUid | nindent 4 }}
+{{- end }}

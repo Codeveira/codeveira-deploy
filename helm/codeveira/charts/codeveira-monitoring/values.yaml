@@ -1,0 +1,45 @@
+# Optional -- disabled by default. Thin wrapper around an existing
+# Prometheus Operator + Grafana install (e.g. the kube-prometheus-stack
+# chart) rather than shipping its own Prometheus/Grafana containers the way
+# the docker-compose monitoring stack does (see docker-compose.monitoring.yml
+# in the main repo for that non-k8s path) -- this subchart deploys no pods
+# of its own, just a ServiceMonitor + a Secret + a dashboard ConfigMap.
+# Prerequisite: a Prometheus Operator + Grafana-with-dashboard-sidecar
+# install (kube-prometheus-stack or equivalent) already on the target
+# cluster -- see the umbrella README's Prerequisites section. If the
+# `ServiceMonitor` CRD isn't present, that one resource is skipped rather
+# than failing the whole `helm install`/`helm template` run.
+enabled: false
+
+serviceMonitor:
+  # Matches monitoring/prometheus.yml in the main repo's docker-compose
+  # monitoring stack.
+  interval: 30s
+  path: /metrics
+
+# Settings -> Metrics requires an Extended license or higher
+# (License.current.feature?(:prometheus_metrics)) and a service-account API
+# token, same as the docker-compose monitoring stack -- see
+# MetricsController#authenticate_service_account. Generate one (Settings >
+# Users, service_account: true checked, then copy its API token) and set it
+# here. Kept in its own Secret rather than codeveira-app's, since
+# ServiceMonitor's bearerTokenSecret field references one specific
+# Secret+key by name.
+auth:
+  token: ""
+
+grafana:
+  # ConfigMaps carrying this label are auto-imported by kube-prometheus-
+  # stack's Grafana sidecar (no manual datasource/import step) -- mirrors
+  # what the docker-compose stack's own file-based provisioning does.
+  dashboardLabel: grafana_dashboard
+  dashboardLabelValue: "1"
+  # UID of the Prometheus datasource your cluster's Grafana has provisioned
+  # -- "prometheus" is kube-prometheus-stack's own default with its stock
+  # values. The bundled dashboard (files/codeveira-dashboard.json, a copy of
+  # the main repo's monitoring/grafana/dashboards/codeveira.json -- keep
+  # them in sync by hand if that file changes) has every panel's datasource
+  # UID rewritten to this value at render time, so it works out of the box
+  # against the common default and can be pointed at a different UID
+  # without hand-editing the dashboard JSON.
+  datasourceUid: prometheus

@@ -1,0 +1,9 @@
+apiVersion: v2
+name: codeveira-postgresql
+description: PostgreSQL database for Codeveira (mirrors the docker-compose db service).
+type: application
+version: 0.1.0
+dependencies:
+  - name: codeveira-common
+    version: 0.1.0
+    repository: file://../codeveira-common

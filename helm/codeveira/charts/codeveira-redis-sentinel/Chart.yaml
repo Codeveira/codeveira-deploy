@@ -1,0 +1,9 @@
+apiVersion: v2
+name: codeveira-redis-sentinel
+description: Optional Redis Sentinel HA overlay on top of codeveira-redis (mirrors docker-compose.sentinel.yml) -- adds a replica + 3 sentinels for automatic failover, disabled by default.
+type: application
+version: 0.1.0
+dependencies:
+  - name: codeveira-common
+    version: 0.1.0
+    repository: file://../codeveira-common

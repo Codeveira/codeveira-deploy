@@ -1,0 +1,9 @@
+apiVersion: v2
+name: codeveira-semantic-analysis
+description: Real (type-checked) semantic analysis across 8 languages -- one parameterized subchart generating a language-server-driver + egress-proxy pod pair per entry in .Values.languages, mirroring the docker-compose semantic-analysis[-<lang>]/semantic-analysis[-<lang>]-proxy service pairs. Optional, disabled by default, and each language is independently toggleable.
+type: application
+version: 0.1.0
+dependencies:
+  - name: codeveira-common
+    version: 0.1.0
+    repository: file://../codeveira-common

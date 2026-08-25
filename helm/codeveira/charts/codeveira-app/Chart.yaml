@@ -1,0 +1,9 @@
+apiVersion: v2
+name: codeveira-app
+description: The Codeveira Puma/Rails web process (mirrors the docker-compose app service).
+type: application
+version: 0.1.0
+dependencies:
+  - name: codeveira-common
+    version: 0.1.0
+    repository: file://../codeveira-common

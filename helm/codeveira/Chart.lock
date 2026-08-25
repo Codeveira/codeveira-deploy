@@ -1,0 +1,39 @@
+dependencies:
+- name: codeveira-common
+  repository: file://charts/codeveira-common
+  version: 0.1.0
+- name: codeveira-postgresql
+  repository: file://charts/codeveira-postgresql
+  version: 0.1.0
+- name: codeveira-redis
+  repository: file://charts/codeveira-redis
+  version: 0.1.0
+- name: codeveira-app
+  repository: file://charts/codeveira-app
+  version: 0.1.0
+- name: codeveira-sidekiq
+  repository: file://charts/codeveira-sidekiq
+  version: 0.1.0
+- name: codeveira-ingress
+  repository: file://charts/codeveira-ingress
+  version: 0.1.0
+- name: codeveira-indexer
+  repository: file://charts/codeveira-indexer
+  version: 0.1.0
+- name: codeveira-lint-runner
+  repository: file://charts/codeveira-lint-runner
+  version: 0.1.0
+- name: codeveira-lsp
+  repository: file://charts/codeveira-lsp
+  version: 0.1.0
+- name: codeveira-semantic-analysis
+  repository: file://charts/codeveira-semantic-analysis
+  version: 0.1.0
+- name: codeveira-redis-sentinel
+  repository: file://charts/codeveira-redis-sentinel
+  version: 0.1.0
+- name: codeveira-monitoring
+  repository: file://charts/codeveira-monitoring
+  version: 0.1.0
+digest: sha256:0003cc5432f30a314245579fd66b2d38915077fc4213d4dc1d2595f3ba5a70e7
+generated: "2026-08-25T11:33:25.768447441+02:00"

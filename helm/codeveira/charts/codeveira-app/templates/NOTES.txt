@@ -1,0 +1,8 @@
+Codeveira app deployed as {{ include "codeveira-common.fullname" . }}.
+
+Check rollout status:
+  kubectl rollout status deployment/{{ include "codeveira-common.fullname" . }}
+
+DEPLOYMENT_PLATFORM=kubernetes is set automatically, which hides the
+Settings -> Domain & HTTPS page in the app (cert-manager owns TLS here
+instead -- see the codeveira-ingress subchart).

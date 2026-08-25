@@ -1,0 +1,43 @@
+apiVersion: v2
+name: codeveira
+description: Codeveira self-hosted code review platform -- MVP Kubernetes deployment (app, sidekiq, postgresql, redis, ingress+cert-manager). See the codeveira-deploy repo's docker-compose.yml for the non-Kubernetes deployment path.
+type: application
+version: 0.1.0
+appVersion: latest
+dependencies:
+  - name: codeveira-common
+    version: 0.1.0
+    repository: file://charts/codeveira-common
+  - name: codeveira-postgresql
+    version: 0.1.0
+    repository: file://charts/codeveira-postgresql
+  - name: codeveira-redis
+    version: 0.1.0
+    repository: file://charts/codeveira-redis
+  - name: codeveira-app
+    version: 0.1.0
+    repository: file://charts/codeveira-app
+  - name: codeveira-sidekiq
+    version: 0.1.0
+    repository: file://charts/codeveira-sidekiq
+  - name: codeveira-ingress
+    version: 0.1.0
+    repository: file://charts/codeveira-ingress
+  - name: codeveira-indexer
+    version: 0.1.0
+    repository: file://charts/codeveira-indexer
+  - name: codeveira-lint-runner
+    version: 0.1.0
+    repository: file://charts/codeveira-lint-runner
+  - name: codeveira-lsp
+    version: 0.1.0
+    repository: file://charts/codeveira-lsp
+  - name: codeveira-semantic-analysis
+    version: 0.1.0
+    repository: file://charts/codeveira-semantic-analysis
+  - name: codeveira-redis-sentinel
+    version: 0.1.0
+    repository: file://charts/codeveira-redis-sentinel
+  - name: codeveira-monitoring
+    version: 0.1.0
+    repository: file://charts/codeveira-monitoring

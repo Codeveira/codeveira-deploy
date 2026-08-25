@@ -13,3 +13,10 @@
 # auto-creates the host directory on first mount, which is all that's needed.
 /pgdata/
 /redis/
+
+# `helm dependency update` build output when a subchart is fetched
+# standalone (regenerated on demand, see helm/codeveira/README.md's
+# "Standalone subcharts" section) -- one level deeper than
+# helm/codeveira/charts/codeveira-common itself, which stays tracked.
+helm/codeveira/charts/*/charts/
+helm/codeveira/charts/*/Chart.lock

@@ -1,0 +1,58 @@
+{{- if .Values.enabled }}
+{{- $g := .Values.global -}}
+{{- $secret := ($g.integrations).lspProxySharedSecret | default .Values.sharedSecret -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "codeveira-common.fullname" . }}
+  labels:
+    {{- include "codeveira-common.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "codeveira-common.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "codeveira-common.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: lsp
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: CODEVEIRA_URL
+              value: {{ .Values.appUrl | quote }}
+            - name: LSP_PORT
+              value: "7777"
+            - name: LSP_PROXY_SHARED_SECRET
+              value: {{ $secret | quote }}
+          ports:
+            - name: lsp
+              containerPort: 7777
+          readinessProbe:
+            tcpSocket:
+              port: lsp
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: lsp
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

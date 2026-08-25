@@ -1,0 +1,57 @@
+# Optional -- disabled by default, same as codeveira-indexer/-lint-runner/
+# -lsp/-semantic-analysis. This is an HA *overlay*, not a replacement for
+# codeveira-redis: enabling it does not disable or reconfigure that
+# subchart's StatefulSet -- it stays exactly as-is and becomes the
+# Sentinel-monitored initial master, mirroring how docker-compose.sentinel.yml
+# merges on top of docker-compose.yml and leaves its `redis` service alone.
+#
+# Turning this subchart on is only half the switch -- codeveira-app and
+# codeveira-sidekiq also need `redisSentinel.enabled: true` (or the global
+# equivalent, `global.redis.sentinelEnabled: true`) before they'll actually
+# talk to Sentinel instead of connecting to codeveira-redis directly. See
+# ../codeveira-app/values.yaml's `redisSentinel` block and the umbrella
+# chart's README.
+enabled: false
+
+image:
+  repository: valkey/valkey
+  tag: "9-alpine"
+  pullPolicy: IfNotPresent
+
+# Where the existing codeveira-redis subchart's Service is -- left at its
+# default ("redis"/6379, matching codeveira-redis.service.name) unless that
+# was also changed.
+master:
+  host: redis
+  port: 6379
+
+replica:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+# Fixed at 3 (quorum 2-of-3, matching docker-compose.sentinel.yml exactly --
+# not a `replicas:` knob) because codeveira-app/-sidekiq's own
+# `redisSentinel.hosts` default is a literal 3-entry list of this
+# StatefulSet's predictable pod DNS names (redis-sentinel-0.redis-sentinel,
+# ...-1..., ...-2...); changing the count here without updating that list on
+# both other subcharts would leave app/sidekiq unable to reach every
+# sentinel.
+sentinel:
+  port: 26379
+  quorum: 2
+  downAfterMilliseconds: 5000
+  failoverTimeout: 10000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      memory: 64Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

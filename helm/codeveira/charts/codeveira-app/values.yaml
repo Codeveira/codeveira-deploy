@@ -1,0 +1,134 @@
+image:
+  repository: ghcr.io/codeveira/codeveira
+  tag: latest
+  pullPolicy: Always
+
+replicaCount: 1
+
+# Named "app" by default (rather than the usual release-prefixed fullname)
+# so codeveira-ingress's default appServiceName: app can find it without
+# umbrella-level string coordination based on the Helm release name.
+service:
+  name: app
+  port: 3000
+
+# HPA disabled by default: entrypoint.sh (baked into the image) runs
+# `rails db:migrate` on every app-container boot, same as docker-compose's
+# single instance -- scaling past 1 replica during a version upgrade can
+# race concurrent migrations. Safe to enable once you have your own
+# pre-upgrade migration Job (not part of this MVP chart) instead.
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 75
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    memory: 1Gi
+
+# /app/storage (ActiveStorage local disk uploads) defaults to emptyDir,
+# same limitation docker-compose's app_storage named volume does not have:
+# it does not survive a pod replacement, and with replicaCount > 1 each pod
+# would see a different, non-shared storage directory. Set enabled: true
+# with a storageClassName that supports ReadWriteMany (e.g. NFS/EFS/
+# Longhorn) for a real multi-pod-safe deployment; RWO is only safe at
+# replicaCount: 1.
+persistence:
+  enabled: false
+  accessMode: ReadWriteOnce
+  size: 20Gi
+  storageClassName: ""
+  existingClaim: ""
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Everything below normally comes from the umbrella chart's `global.*`
+# values so app and sidekiq stay in sync -- see codeveira/values.yaml.
+# Set these directly only when running this chart standalone.
+database:
+  host: db
+  port: 5432
+  name: codereview
+  user: codereview
+  password: ""
+
+redis:
+  host: redis
+  port: 6379
+
+# Off by default -- REDIS_URL above is used as-is. Set to true (or
+# global.redis.sentinelEnabled: true) only once codeveira-redis-sentinel is
+# also enabled; REDIS_SENTINELS/REDIS_MASTER_NAME get added alongside
+# REDIS_URL rather than replacing it (lib/redis_sentinel_config.rb ignores
+# REDIS_URL whenever REDIS_SENTINELS is present, so leaving it set is
+# harmless). `hosts` defaults to that subchart's 3 fixed sentinel pod DNS
+# names -- see ../codeveira-redis-sentinel/values.yaml.
+redisSentinel:
+  enabled: false
+  masterName: mymaster
+  hosts:
+    - redis-sentinel-0.redis-sentinel:26379
+    - redis-sentinel-1.redis-sentinel:26379
+    - redis-sentinel-2.redis-sentinel:26379
+
+rails:
+  secretKeyBase: ""
+  encryptionPrimaryKey: ""
+  encryptionDeterministicKey: ""
+  encryptionKeyDerivationSalt: ""
+
+appHost: ""
+forceSsl: true
+
+admin:
+  email: admin@example.com
+  password: ""
+
+# Git provider / webhook / SMTP / LDAP integration secrets -- all optional,
+# same as their ${VAR:-} defaults in docker-compose.yml. Leave blank to
+# disable a given integration.
+integrations:
+  gitlabUrl: ""
+  gitlabAppId: ""
+  gitlabAppSecret: ""
+  webhookSecret: ""
+  githubToken: ""
+  githubAppId: ""
+  githubAppSecret: ""
+  githubWebhookSecret: ""
+  giteaUrl: ""
+  giteaWebhookSecret: ""
+  bitbucketWebhookSecret: ""
+  bitbucketServerWebhookSecret: ""
+  azureWebhookSecret: ""
+  gerritWebhookSecret: ""
+  lspProxySharedSecret: ""
+  # URLs default to codeveira-indexer/codeveira-lint-runner's fixed Service
+  # names -- only relevant if you also enable those (optional, disabled by
+  # default) subcharts. Tokens can instead be set once via
+  # global.integrations.symbolIndexerToken/lintRunnerToken/lspProxySharedSecret
+  # so app/sidekiq and indexer/lint-runner/lsp always agree.
+  symbolIndexerUrl: "http://indexer:8090"
+  symbolIndexerToken: ""
+  lintRunnerUrl: "http://lint-runner:8091"
+  lintRunnerToken: ""
+  inboundEmailDomain: ""
+  railsInboundEmailPassword: ""
+  ldapHost: ""
+  ldapPort: "389"
+  ldapSsl: "false"
+  ldapBase: ""
+  ldapBindDn: ""
+  ldapPassword: ""
+  ldapDomain: ""
+  smtpHost: ""
+  smtpPort: "587"
+  smtpUser: ""
+  smtpPassword: ""
+  smtpFrom: ""

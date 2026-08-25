@@ -1,0 +1,35 @@
+{{- if .Values.enabled }}
+{{- if not .Values.auth.token }}
+{{- fail "codeveira-monitoring: auth.token is required -- generate a service-account API token (Settings > Users) first" }}
+{{- end }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: codeveira-monitoring-token
+  labels:
+    {{- include "codeveira-common.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  token: {{ .Values.auth.token | quote }}
+{{- if .Capabilities.APIVersions.Has "monitoring.coreos.com/v1/ServiceMonitor" }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: codeveira
+  labels:
+    {{- include "codeveira-common.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: codeveira-app
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  endpoints:
+    - port: http
+      path: {{ .Values.serviceMonitor.path }}
+      interval: {{ .Values.serviceMonitor.interval }}
+      bearerTokenSecret:
+        name: codeveira-monitoring-token
+        key: token
+{{- end }}
+{{- end }}

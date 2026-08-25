@@ -1,0 +1,9 @@
+apiVersion: v2
+name: codeveira-lsp
+description: Global Language Server Protocol proxy for VS Code/JetBrains/Neovim integration (mirrors the docker-compose lsp service). Optional, disabled by default.
+type: application
+version: 0.1.0
+dependencies:
+  - name: codeveira-common
+    version: 0.1.0
+    repository: file://../codeveira-common

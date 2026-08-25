@@ -61,6 +61,10 @@ It starts a second `app` replica on the newly pulled image next to the running o
 
 This needs the bundled nginx in front, since it relies on scaling `app` to two containers on the same host port 3000 internally: it does not work with `docker-compose.byo-proxy.yml`, which publishes `app:3000` directly to the host (two replicas would conflict on that port). Use the plain rollout above in that setup.
 
+## Kubernetes (Helm)
+
+Prefer Kubernetes over docker-compose? See [`helm/codeveira/README.md`](helm/codeveira/README.md) for an MVP Helm deployment (app, sidekiq, postgresql, redis, native `Ingress` + `cert-manager`) — every service is its own subchart. `Deployment` rolling updates + the same `/up` readiness probe `rollout.sh` polls above give you zero-downtime rollouts natively there, so `rollout.sh`/`make rollout` are docker-compose-only and not needed under Kubernetes. Settings → Domain & HTTPS is hidden automatically in that deployment mode, since `cert-manager` owns certificate issuance/renewal at the cluster level instead.
+
 ## Pinning a version
 
 ```bash

@@ -1,0 +1,30 @@
+# Set to false if you're pointing REDIS_URL at an externally managed Redis
+# instead -- then this subchart renders no resources at all.
+enabled: true
+
+image:
+  repository: valkey/valkey
+  tag: "9-alpine"
+  pullPolicy: IfNotPresent
+
+# Named "redis" by default (matching the docker-compose service name) purely
+# for consistency with codeveira-postgresql's "db" -- REDIS_URL is a plain
+# env var on app/sidekiq, so unlike Postgres nothing has this hardcoded.
+service:
+  name: redis
+
+persistence:
+  enabled: true
+  size: 5Gi
+  storageClassName: ""
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

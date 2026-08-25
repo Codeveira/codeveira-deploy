@@ -1,0 +1,138 @@
+{{- if .Values.enabled }}
+{{- $root := . -}}
+{{- $g := .Values.global | default dict -}}
+{{- range $name, $lang := .Values.languages }}
+{{- if $lang.enabled }}
+{{- $token := dig "integrations" "semanticAnalysisTokens" $name $lang.auth.token $g }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "codeveira-common.fullname" $root }}-{{ $name }}
+  labels:
+    {{- include "codeveira-common.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: semantic-analysis-{{ $name }}
+spec:
+  replicas: {{ $root.Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "codeveira-common.selectorLabels" $root | nindent 6 }}
+      app.kubernetes.io/component: semantic-analysis-{{ $name }}
+  template:
+    metadata:
+      labels:
+        {{- include "codeveira-common.selectorLabels" $root | nindent 8 }}
+        app.kubernetes.io/component: semantic-analysis-{{ $name }}
+    spec:
+      containers:
+        - name: semantic-analysis
+          image: "{{ $root.Values.image.registry }}/codeveira-semantic-analysis{{ $lang.suffix }}:{{ $root.Values.image.tag }}"
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          env:
+            - name: {{ $lang.envPrefix }}_TOKEN
+              value: {{ $token | quote }}
+            - name: {{ $lang.envPrefix }}_CACHE_MAX_MB
+              value: {{ $lang.cacheMaxMb | quote }}
+            - name: HTTP_PROXY
+              value: "http://semantic-analysis{{ $lang.suffix }}-proxy:8888"
+            - name: HTTPS_PROXY
+              value: "http://semantic-analysis{{ $lang.suffix }}-proxy:8888"
+            - name: NO_PROXY
+              value: "localhost,127.0.0.1"
+          ports:
+            - name: http
+              containerPort: {{ $lang.port }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml $lang.resources | nindent 12 }}
+          volumeMounts:
+            - name: cache
+              mountPath: {{ $lang.cachePath }}
+      volumes:
+        - name: cache
+          {{- if $root.Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "codeveira-common.fullname" $root }}-{{ $name }}-cache
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with $root.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $root.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $root.Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+# Egress allowlist for this language's sandboxed dependency-install step
+# (go mod download / npm ci / pip install / mvn dependency:resolve /
+# composer install / dotnet restore / bundle install) -- filter.conf is
+# baked into the proxy image at build time, one image per language, same
+# as docker-compose. NOTE for php specifically: the self-hosted
+# GitLab/Gitea/Forgejo/Bitbucket-Server dynamic allowlist reload (see
+# ComposerProxyFilter / RegenerateComposerProxyFilterJob in the main repo)
+# is NOT wired up here -- it needs a ReadWriteMany volume shared between
+# codeveira-app, codeveira-sidekiq (write) and this proxy pod (read),
+# spanning two different subcharts, which this MVP does not attempt. The
+# php proxy runs with its static bake-time allowlist only (GitHub-hosted
+# Composer packages work; self-hosted VCS-hosted ones do not), matching
+# the pre-2026-08-22 baseline.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "codeveira-common.fullname" $root }}-{{ $name }}-proxy
+  labels:
+    {{- include "codeveira-common.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: semantic-analysis-{{ $name }}-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "codeveira-common.selectorLabels" $root | nindent 6 }}
+      app.kubernetes.io/component: semantic-analysis-{{ $name }}-proxy
+  template:
+    metadata:
+      labels:
+        {{- include "codeveira-common.selectorLabels" $root | nindent 8 }}
+        app.kubernetes.io/component: semantic-analysis-{{ $name }}-proxy
+    spec:
+      containers:
+        - name: proxy
+          image: "{{ $root.Values.image.registry }}/codeveira-semantic-analysis{{ $lang.suffix }}-proxy:{{ $root.Values.image.tag }}"
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8888
+          resources:
+            {{- toYaml $root.Values.proxy.resources | nindent 12 }}
+      {{- with $root.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $root.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $root.Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

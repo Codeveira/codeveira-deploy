@@ -1,0 +1,109 @@
+enabled: true
+
+image:
+  repository: ghcr.io/codeveira/codeveira
+  tag: latest
+  pullPolicy: Always
+
+command: ["bundle", "exec", "sidekiq", "-C", "config/sidekiq.yml"]
+
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    memory: 1Gi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Same as codeveira-app/values.yaml -- normally supplied via the umbrella
+# chart's global.* values instead. See there for details.
+database:
+  host: db
+  port: 5432
+  name: codereview
+  user: codereview
+  password: ""
+
+redis:
+  host: redis
+  port: 6379
+
+# See ../codeveira-app/values.yaml's redisSentinel block -- same shape,
+# same global.redis.sentinelEnabled fallback, must be set identically here
+# (Sidekiq's Redis connection is separate from Puma's).
+redisSentinel:
+  enabled: false
+  masterName: mymaster
+  hosts:
+    - redis-sentinel-0.redis-sentinel:26379
+    - redis-sentinel-1.redis-sentinel:26379
+    - redis-sentinel-2.redis-sentinel:26379
+
+rails:
+  secretKeyBase: ""
+  encryptionPrimaryKey: ""
+  encryptionDeterministicKey: ""
+  encryptionKeyDerivationSalt: ""
+
+appHost: ""
+
+integrations:
+  gitlabUrl: ""
+  # Same as codeveira-app/values.yaml's equivalents -- only relevant if you
+  # also enable codeveira-indexer/codeveira-lint-runner. Tokens can instead
+  # be set once via global.integrations.symbolIndexerToken/lintRunnerToken.
+  symbolIndexerUrl: "http://indexer:8090"
+  symbolIndexerToken: ""
+  lintRunnerUrl: "http://lint-runner:8091"
+  lintRunnerToken: ""
+  # Same as above -- only relevant if you also enable
+  # codeveira-semantic-analysis (per-language, all disabled by default).
+  # Each token can instead be set once via
+  # global.integrations.semanticAnalysisTokens.<name> in the umbrella
+  # chart's values so codeveira-semantic-analysis and codeveira-sidekiq
+  # always agree, instead of repeating it here.
+  semanticAnalysis:
+    - name: go
+      envPrefix: SEMANTIC_ANALYSIS
+      url: "http://semantic-analysis:8092"
+      token: ""
+    - name: ts
+      envPrefix: SEMANTIC_ANALYSIS_TS
+      url: "http://semantic-analysis-ts:8093"
+      token: ""
+    - name: py
+      envPrefix: SEMANTIC_ANALYSIS_PY
+      url: "http://semantic-analysis-py:8094"
+      token: ""
+    - name: java
+      envPrefix: SEMANTIC_ANALYSIS_JAVA
+      url: "http://semantic-analysis-java:8095"
+      token: ""
+    - name: kt
+      envPrefix: SEMANTIC_ANALYSIS_KT
+      url: "http://semantic-analysis-kt:8096"
+      token: ""
+    - name: php
+      envPrefix: SEMANTIC_ANALYSIS_PHP
+      url: "http://semantic-analysis-php:8097"
+      token: ""
+    - name: csharp
+      envPrefix: SEMANTIC_ANALYSIS_CSHARP
+      url: "http://semantic-analysis-csharp:8098"
+      token: ""
+    - name: ruby
+      envPrefix: SEMANTIC_ANALYSIS_RUBY
+      url: "http://semantic-analysis-ruby:8099"
+      token: ""
+  inboundEmailDomain: ""
+  railsInboundEmailPassword: ""
+  smtpHost: ""
+  smtpPort: "587"
+  smtpUser: ""
+  smtpPassword: ""
+  smtpFrom: ""

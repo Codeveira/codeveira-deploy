@@ -1,0 +1,5 @@
+apiVersion: v2
+name: codeveira-common
+description: Shared helpers (naming, labels, probes) for the codeveira subcharts. No resources of its own.
+type: library
+version: 0.1.0

@@ -1,0 +1,9 @@
+apiVersion: v2
+name: codeveira-ingress
+description: Native Kubernetes Ingress + cert-manager TLS for the Codeveira app (Option B -- requires an existing Ingress controller and cert-manager on the cluster).
+type: application
+version: 0.1.0
+dependencies:
+  - name: codeveira-common
+    version: 0.1.0
+    repository: file://../codeveira-common

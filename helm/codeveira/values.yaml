@@ -1,0 +1,108 @@
+# MVP Kubernetes deployment for Codeveira: app + sidekiq + postgresql +
+# redis + ingress(cert-manager), plus the optional (disabled-by-default)
+# indexer/lint-runner/lsp/semantic-analysis/redis-sentinel/monitoring feature
+# subcharts below. See charts/*/values.yaml for every knob; this file only
+# needs to set the handful of secrets/hostnames below to get a working
+# install: `helm install codeveira -f my-values.yaml ./codeveira`
+
+global:
+  appHost: ""            # e.g. codeveira.example.com -- required
+  forceSsl: true          # ingress terminates TLS; Rails still redirects http->https
+
+  database:
+    name: codereview
+    user: codereview
+    password: ""          # required
+    host: db               # matches codeveira-postgresql's fixed Service name
+    port: 5432
+
+  redis:
+    host: redis            # matches codeveira-redis's fixed Service name
+    port: 6379
+    # Optional. Only relevant once you enable codeveira-redis-sentinel
+    # below -- overrides codeveira-app/codeveira-sidekiq's own
+    # redisSentinel.* defaults in one place. See
+    # charts/codeveira-redis-sentinel/values.yaml.
+    # sentinelEnabled: true
+    # sentinelMasterName: mymaster
+    # sentinelHosts:
+    #   - redis-sentinel-0.redis-sentinel:26379
+    #   - redis-sentinel-1.redis-sentinel:26379
+    #   - redis-sentinel-2.redis-sentinel:26379
+
+  rails:
+    secretKeyBase: ""                    # required -- `rails secret`
+    encryptionPrimaryKey: ""              # required -- `rails db:encryption:init`
+    encryptionDeterministicKey: ""        # required
+    encryptionKeyDerivationSalt: ""       # required
+
+  admin:
+    email: admin@example.com
+    password: ""           # required
+
+  # Optional. Only relevant once you enable codeveira-indexer/
+  # codeveira-lint-runner/codeveira-lsp below -- set the matching token(s)
+  # here once instead of repeating them in both the feature subchart's
+  # values and codeveira-app/codeveira-sidekiq's.
+  # integrations:
+  #   symbolIndexerToken: ""
+  #   lintRunnerToken: ""
+  #   lspProxySharedSecret: ""
+  #   semanticAnalysisTokens:
+  #     go: ""
+  #     ts: ""
+  #     py: ""
+  #     java: ""
+  #     kt: ""
+  #     php: ""
+  #     csharp: ""
+  #     ruby: ""
+
+# Per-subchart overrides. Anything not listed here falls back to that
+# subchart's own charts/<name>/values.yaml defaults.
+codeveira-postgresql:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 20Gi
+
+codeveira-redis:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 5Gi
+
+codeveira-app:
+  replicaCount: 1
+  # integrations: {}   # git provider tokens / SMTP / LDAP -- see
+                         # charts/codeveira-app/values.yaml for the full list
+
+codeveira-sidekiq:
+  enabled: true
+  replicaCount: 1
+
+codeveira-ingress:
+  enabled: true
+  className: nginx
+  clusterIssuer:
+    create: true
+    email: ""             # required when clusterIssuer.create is true
+
+# Optional -- HA overlay on top of codeveira-redis (does not replace it,
+# adds a replica + 3-pod Sentinel StatefulSet). Disabled by default. When
+# enabling, also set global.redis.sentinelEnabled: true (or
+# codeveira-app/codeveira-sidekiq's own redisSentinel.enabled) so the app
+# actually switches to Sentinel mode -- see
+# charts/codeveira-redis-sentinel/values.yaml.
+codeveira-redis-sentinel:
+  enabled: false
+
+# Optional -- thin wrapper wiring /metrics into an existing Prometheus
+# Operator + Grafana install (e.g. kube-prometheus-stack). Deploys no
+# Prometheus/Grafana of its own. Requires an Extended-or-higher license and
+# a service-account API token -- see
+# charts/codeveira-monitoring/values.yaml.
+codeveira-monitoring:
+  enabled: false
+  auth:
+    token: ""             # required when enabled -- service-account API token

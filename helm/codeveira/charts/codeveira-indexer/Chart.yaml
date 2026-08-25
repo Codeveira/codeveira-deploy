@@ -1,0 +1,9 @@
+apiVersion: v2
+name: codeveira-indexer
+description: Tree-sitter symbol-indexing service backing Find Usages/Go to Declaration/Go to Symbol (mirrors the docker-compose indexer service). Optional, disabled by default.
+type: application
+version: 0.1.0
+dependencies:
+  - name: codeveira-common
+    version: 0.1.0
+    repository: file://../codeveira-common

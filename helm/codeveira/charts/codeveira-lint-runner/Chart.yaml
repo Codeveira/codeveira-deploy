@@ -1,0 +1,9 @@
+apiVersion: v2
+name: codeveira-lint-runner
+description: Architectural Lint / duplicate/dead-symbol scanning service (mirrors the docker-compose lint-runner service). Optional, disabled by default.
+type: application
+version: 0.1.0
+dependencies:
+  - name: codeveira-common
+    version: 0.1.0
+    repository: file://../codeveira-common

@@ -1,0 +1,42 @@
+{{- if $.Values.enabled }}
+{{- $issuerName := .Values.existingIssuerName | default .Values.clusterIssuer.name -}}
+{{- $host := .Values.global.appHost | default .Values.host -}}
+{{- if not $host }}
+{{- fail "codeveira-ingress: host is required (or global.appHost from the umbrella chart)" }}
+{{- end }}
+{{- if not .Values.appServiceName }}
+{{- fail "codeveira-ingress: appServiceName is required (normally supplied by the umbrella chart)" }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "codeveira-common.fullname" . }}
+  labels:
+    {{- include "codeveira-common.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ $issuerName }}
+    {{- end }}
+    {{- with .Values.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.className }}
+  {{- if .Values.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ $host }}
+      secretName: {{ .Values.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ $host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.appServiceName }}
+                port:
+                  number: {{ .Values.appServicePort }}
+{{- end }}

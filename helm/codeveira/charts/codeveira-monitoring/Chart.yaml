@@ -1,0 +1,9 @@
+apiVersion: v2
+name: codeveira-monitoring
+description: Optional thin wrapper wiring Codeveira's /metrics endpoint into an existing Prometheus Operator + Grafana install (e.g. kube-prometheus-stack) -- disabled by default, no Prometheus/Grafana of its own.
+type: application
+version: 0.1.0
+dependencies:
+  - name: codeveira-common
+    version: 0.1.0
+    repository: file://../codeveira-common

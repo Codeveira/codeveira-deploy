@@ -1,0 +1,71 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-replica
+  labels:
+    {{- include "codeveira-common.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis-replica
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "codeveira-common.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: redis-replica
+  template:
+    metadata:
+      labels:
+        {{- include "codeveira-common.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: redis-replica
+    spec:
+      containers:
+        - name: redis-replica
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # No volume -- mirrors docker-compose.sentinel.yml's redis-replica,
+          # which is also ephemeral and re-syncs from the master on restart.
+          command: ["valkey-server", "--replicaof", {{ .Values.master.host | quote }}, {{ .Values.master.port | quote }}]
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["valkey-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["valkey-cli", "ping"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.replica.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-replica
+  labels:
+    {{- include "codeveira-common.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis-replica
+spec:
+  selector:
+    {{- include "codeveira-common.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis-replica
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+{{- end }}

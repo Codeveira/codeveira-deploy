@@ -1,0 +1,9 @@
+apiVersion: v2
+name: codeveira-redis
+description: Valkey (Redis-compatible) cache/queue backend for Codeveira (mirrors the docker-compose redis service).
+type: application
+version: 0.1.0
+dependencies:
+  - name: codeveira-common
+    version: 0.1.0
+    repository: file://../codeveira-common

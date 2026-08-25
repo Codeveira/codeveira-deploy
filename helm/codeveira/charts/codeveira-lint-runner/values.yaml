@@ -1,0 +1,38 @@
+# Optional -- disabled by default. Without it, Architectural Lint and
+# duplicate/dead-symbol detection stay inactive; nothing else in the app
+# depends on it being up.
+enabled: false
+
+image:
+  repository: ghcr.io/codeveira/codeveira-lint-runner
+  tag: latest
+  pullPolicy: Always
+
+replicaCount: 1
+
+# Named "lint-runner" by default (matching the docker-compose service name),
+# same reasoning as codeveira-indexer -- so codeveira-app/codeveira-sidekiq's
+# default LINT_RUNNER_URL can find it with no umbrella-level coordination.
+service:
+  name: lint-runner
+  port: 8091
+
+maxFileSizeBytes: "2000000"
+
+# Shared secret required in the X-Lint-Token header. Optional but strongly
+# recommended, same reasoning as codeveira-indexer's auth.token. Must match
+# codeveira-app's and codeveira-sidekiq's integrations.lintRunnerToken (or
+# set once via global.integrations.lintRunnerToken in the umbrella chart).
+auth:
+  token: ""
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 384Mi
+  limits:
+    memory: 768Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

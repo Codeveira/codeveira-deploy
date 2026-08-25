@@ -1,0 +1,9 @@
+apiVersion: v2
+name: codeveira-sidekiq
+description: The Codeveira Sidekiq background-job worker (mirrors the docker-compose sidekiq service).
+type: application
+version: 0.1.0
+dependencies:
+  - name: codeveira-common
+    version: 0.1.0
+    repository: file://../codeveira-common

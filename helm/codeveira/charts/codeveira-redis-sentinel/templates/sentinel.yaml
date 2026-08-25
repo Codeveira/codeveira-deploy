@@ -1,0 +1,119 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-sentinel-conf
+  labels:
+    {{- include "codeveira-common.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis-sentinel
+data:
+  # Identical for all 3 sentinel pods below -- Sentinel discovers its peers
+  # and the replica via gossip once pointed at the master, same as
+  # redis-sentinel/sentinel.conf.template in the main repo. Mounted
+  # read-only and copied into each pod's own writable layer at startup
+  # (see the `command:` below) since Sentinel rewrites this file at runtime
+  # to persist discovered state, and 3 pods sharing one mounted file would
+  # clobber each other's rewrites.
+  sentinel.conf.template: |
+    port {{ .Values.sentinel.port }}
+    # Sentinel refuses hostnames in `sentinel monitor` (and in what it
+    # reports back to clients) unless these are explicitly turned on --
+    # without them it demands raw IPs, which don't work for a k8s Service
+    # DNS name any more than they work for a Docker Compose service name.
+    sentinel resolve-hostnames yes
+    sentinel announce-hostnames yes
+    sentinel monitor mymaster {{ .Values.master.host }} {{ .Values.master.port }} {{ .Values.sentinel.quorum }}
+    sentinel down-after-milliseconds mymaster {{ .Values.sentinel.downAfterMilliseconds }}
+    sentinel failover-timeout mymaster {{ .Values.sentinel.failoverTimeout }}
+    sentinel parallel-syncs mymaster 1
+---
+# Fixed name (not codeveira-common.fullname-derived) so codeveira-app/
+# -sidekiq's REDIS_SENTINELS default (a literal list of
+# redis-sentinel-{0,1,2}.redis-sentinel hostnames) resolves correctly --
+# same fixed-Service-name convention as codeveira-redis's "redis",
+# codeveira-postgresql's "db", and the semantic-analysis subchart's
+# suffix-derived names.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-sentinel
+  labels:
+    {{- include "codeveira-common.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis-sentinel
+spec:
+  serviceName: redis-sentinel
+  replicas: 3
+  selector:
+    matchLabels:
+      {{- include "codeveira-common.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: redis-sentinel
+  template:
+    metadata:
+      labels:
+        {{- include "codeveira-common.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: redis-sentinel
+    spec:
+      containers:
+        - name: sentinel
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - cp /etc/redis/sentinel.conf.template /tmp/sentinel.conf && valkey-server /tmp/sentinel.conf --sentinel
+          ports:
+            - name: sentinel
+              containerPort: {{ .Values.sentinel.port }}
+          volumeMounts:
+            - name: conf
+              mountPath: /etc/redis
+              readOnly: true
+          readinessProbe:
+            exec:
+              command: ["valkey-cli", "-p", {{ .Values.sentinel.port | quote }}, "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["valkey-cli", "-p", {{ .Values.sentinel.port | quote }}, "ping"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.sentinel.resources | nindent 12 }}
+      volumes:
+        - name: conf
+          configMap:
+            name: redis-sentinel-conf
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-sentinel
+  labels:
+    {{- include "codeveira-common.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis-sentinel
+spec:
+  # Headless -- gives each pod a stable per-ordinal DNS name
+  # (redis-sentinel-0.redis-sentinel, ...-1..., ...-2...), which is what
+  # codeveira-app/-sidekiq's REDIS_SENTINELS default list points at.
+  clusterIP: None
+  selector:
+    {{- include "codeveira-common.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis-sentinel
+  ports:
+    - name: sentinel
+      port: {{ .Values.sentinel.port }}
+      targetPort: sentinel
+{{- end }}

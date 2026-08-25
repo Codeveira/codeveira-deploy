@@ -1,0 +1,211 @@
+# Optional -- disabled by default, matching codeveira-indexer/
+# codeveira-lint-runner/codeveira-lsp. Unlike those, this chart generates a
+# *pair* of Deployments+Services per entry in `languages` below (the
+# language-server driver, and its own dedicated egress-allowlist proxy --
+# each `Repository#semantic_analysis_language` picks exactly one language,
+# so per-language `enabled` flags below let an operator run only the
+# language(s) they actually need instead of all 8).
+#
+# `languages` is a MAP (keyed by language name), not a list, deliberately --
+# Helm replaces whole lists wholesale when a values file overrides one
+# instead of merging element-by-element, so overriding a single list entry
+# would silently drop that entry's other fields (port, cachePath, ...). A
+# map merges key-by-key like every other nested value here, so turning one
+# language on is just:
+#   codeveira-semantic-analysis:
+#     enabled: true
+#     languages:
+#       go:
+#         enabled: true
+enabled: false
+
+image:
+  # Language driver images are ghcr.io/codeveira/codeveira-semantic-analysis
+  # (go) / codeveira-semantic-analysis<suffix> (others); proxy images add a
+  # further "-proxy" suffix. See languages.<name>.suffix below -- it drives
+  # both the image repository name and this pair's fixed Service names,
+  # exactly matching docker-compose's own service-naming convention.
+  registry: ghcr.io/codeveira
+  tag: latest
+  pullPolicy: Always
+
+# Applies to every enabled language's driver pod. Fine to leave at 1 -- see
+# persistence below for why going higher needs a ReadWriteMany StorageClass.
+replicaCount: 1
+
+# Each enabled language gets its own PVC for its dependency-install cache
+# (go mod / npm / pip / .m2 / composer cache / NuGet packages / bundler
+# cache) at languages.<name>.cachePath below. Kept persistent by default
+# (unlike codeveira-indexer, which has no cache) because the drivers' own
+# size-capped mtime-LRU eviction pass (cache_evict.go, see IDEAS.md) exists
+# specifically to bound a *persistent* cache's growth -- an emptyDir would
+# defeat the whole point by forcing a full re-download on every pod
+# restart. ReadWriteOnce is enough at replicaCount: 1.
+persistence:
+  enabled: true
+  size: 5Gi
+  storageClassName: ""
+
+# Shared by every language's proxy pod -- tinyproxy is lightweight
+# regardless of which language it's fronting. docker-compose sets no
+# mem_limit/cpus on these containers at all (unlimited); this chart adds a
+# modest default since unbounded requests/limits are poor practice on a
+# real cluster.
+proxy:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
+# One entry per docker-compose semantic-analysis[-<lang>] service. `suffix`
+# drives both the image repository name and this pair's fixed Service names
+# (e.g. "" -> semantic-analysis:8092, "-ts" -> semantic-analysis-ts:8093) --
+# codeveira-sidekiq's own `integrations.semanticAnalysis` map (see
+# ../codeveira-sidekiq/values.yaml) already defaults its URLs to match.
+# `envPrefix` names the env vars both this pod and codeveira-sidekiq read
+# (SEMANTIC_ANALYSIS[_<X>]_TOKEN/_CACHE_MAX_MB). Each token can instead be
+# set once via global.integrations.semanticAnalysisTokens.<name> in the
+# umbrella chart so this subchart and codeveira-sidekiq always agree,
+# instead of repeating it in both places.
+languages:
+  go:
+    enabled: false
+    suffix: ""
+    envPrefix: SEMANTIC_ANALYSIS
+    port: 8092
+    cachePath: /home/analyzer/go/pkg/mod
+    cacheMaxMb: ""
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: "1500m"
+        memory: 1536Mi
+    auth:
+      token: ""
+
+  ts:
+    enabled: false
+    suffix: "-ts"
+    envPrefix: SEMANTIC_ANALYSIS_TS
+    port: 8093
+    cachePath: /home/analyzer/.npm
+    cacheMaxMb: ""
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: "1500m"
+        memory: 1536Mi
+    auth:
+      token: ""
+
+  py:
+    enabled: false
+    suffix: "-py"
+    envPrefix: SEMANTIC_ANALYSIS_PY
+    port: 8094
+    cachePath: /home/analyzer/.cache/pip
+    cacheMaxMb: ""
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: "1500m"
+        memory: 1536Mi
+    auth:
+      token: ""
+
+  java:
+    enabled: false
+    suffix: "-java"
+    envPrefix: SEMANTIC_ANALYSIS_JAVA
+    port: 8095
+    cachePath: /home/analyzer/.m2/repository
+    cacheMaxMb: ""
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: "1500m"
+        memory: 1536Mi
+    auth:
+      token: ""
+
+  kt:
+    enabled: false
+    suffix: "-kt"
+    envPrefix: SEMANTIC_ANALYSIS_KT
+    port: 8096
+    cachePath: /home/analyzer/.m2/repository
+    cacheMaxMb: ""
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: "1500m"
+        memory: 1536Mi
+    auth:
+      token: ""
+
+  php:
+    enabled: false
+    suffix: "-php"
+    envPrefix: SEMANTIC_ANALYSIS_PHP
+    port: 8097
+    cachePath: /home/analyzer/.cache/composer
+    cacheMaxMb: ""
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: "1000m"
+        memory: 1024Mi
+    auth:
+      token: ""
+
+  csharp:
+    enabled: false
+    suffix: "-csharp"
+    envPrefix: SEMANTIC_ANALYSIS_CSHARP
+    port: 8098
+    cachePath: /home/analyzer/.nuget/packages
+    cacheMaxMb: ""
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: "1500m"
+        memory: 1536Mi
+    auth:
+      token: ""
+
+  ruby:
+    enabled: false
+    suffix: "-ruby"
+    envPrefix: SEMANTIC_ANALYSIS_RUBY
+    port: 8099
+    cachePath: /home/analyzer/.cache/bundle
+    cacheMaxMb: ""
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: "1500m"
+        memory: 1536Mi
+    auth:
+      token: ""
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

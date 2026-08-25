@@ -1,0 +1,39 @@
+{{- if .Values.enabled }}
+{{- $root := . -}}
+{{- range $name, $lang := .Values.languages }}
+{{- if $lang.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: semantic-analysis{{ $lang.suffix }}
+  labels:
+    {{- include "codeveira-common.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: semantic-analysis-{{ $name }}
+spec:
+  selector:
+    {{- include "codeveira-common.selectorLabels" $root | nindent 4 }}
+    app.kubernetes.io/component: semantic-analysis-{{ $name }}
+  ports:
+    - name: http
+      port: {{ $lang.port }}
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: semantic-analysis{{ $lang.suffix }}-proxy
+  labels:
+    {{- include "codeveira-common.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: semantic-analysis-{{ $name }}-proxy
+spec:
+  selector:
+    {{- include "codeveira-common.selectorLabels" $root | nindent 4 }}
+    app.kubernetes.io/component: semantic-analysis-{{ $name }}-proxy
+  ports:
+    - name: http
+      port: 8888
+      targetPort: http
+{{- end }}
+{{- end }}
+{{- end }}

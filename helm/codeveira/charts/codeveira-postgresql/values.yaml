@@ -1,0 +1,44 @@
+# Set to false if you're pointing DATABASE_URL at an externally managed
+# Postgres instead (e.g. a cloud-provider RDS/Cloud SQL) -- then this
+# subchart renders no resources at all.
+enabled: true
+
+# Standalone defaults. When deployed as part of the codeveira umbrella
+# chart, database.* below is normally overridden from global.database (see
+# the umbrella chart's values.yaml) so app/sidekiq and this chart agree on
+# one set of credentials without copy-pasting them twice.
+image:
+  repository: postgres
+  tag: "18"
+  pullPolicy: IfNotPresent
+
+# entrypoint.sh (baked into the app/sidekiq image) waits on `pg_isready -h db`
+# before running migrations -- that hostname is not configurable via env var,
+# so this Service is named "db" by default rather than following the usual
+# release-name-prefixed fullname, so in-cluster DNS resolves it the same way
+# docker-compose's service name did. Override only if you know what you are
+# doing (e.g. running this chart standalone, outside the codeveira umbrella).
+service:
+  name: db
+
+database:
+  name: codereview
+  user: codereview
+  # Required — no default on purpose, same as DB_PASSWORD:? in docker-compose.yml.
+  password: ""
+
+persistence:
+  enabled: true
+  size: 20Gi
+  storageClassName: ""
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    memory: 1Gi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,29 @@
+enabled: true
+
+# Prerequisites, not installed by this chart:
+#   - an Ingress controller (e.g. ingress-nginx, Traefik) already deployed
+#   - cert-manager (the jetstack chart + its CRDs) already deployed
+host: ""
+className: nginx
+
+# Matches codeveira-app's values.yaml service.name default -- see the
+# comment there. Override both together if you rename one.
+appServiceName: app
+appServicePort: 3000
+
+tls:
+  enabled: true
+  secretName: codeveira-tls
+
+# clusterIssuer.create: true renders a ClusterIssuer here (ACME HTTP-01
+# against Let's Encrypt, using className above as the solver's ingress
+# class). Set to false and point existingIssuerName at a cluster-wide
+# issuer your platform team already manages instead.
+clusterIssuer:
+  create: true
+  name: codeveira-letsencrypt
+  email: ""
+  server: https://acme-v02.api.letsencrypt.org/directory
+existingIssuerName: ""
+
+annotations: {}

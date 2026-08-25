@@ -1,0 +1,46 @@
+# Optional -- disabled by default. Without it, the global IDE integration
+# (VS Code/JetBrains/Neovim: inline diagnostics, Find Usages, Go to
+# Declaration/Symbol) is unavailable; nothing else in the app depends on it.
+enabled: false
+
+image:
+  repository: ghcr.io/codeveira/codeveira-lsp
+  tag: latest
+  pullPolicy: Always
+
+replicaCount: 1
+
+# Named "lsp" by default, same reasoning as the other internal services.
+# type stays ClusterIP by default: external exposure of this raw TCP
+# LSP-over-socket proxy (port 7777, cannot go through a plain HTTP Ingress)
+# is a deliberately open decision -- see the "codeveira-ingress" section of
+# ../../IDEAS.md's Helm plan (LoadBalancer vs. an ingress-nginx TCP
+# ConfigMap entry, not yet resolved). Override service.type/annotations, or
+# bring your own Service/ConfigMap, to expose it to IDE clients outside the
+# cluster in the meantime.
+service:
+  name: lsp
+  port: 7777
+  type: ClusterIP
+
+# codeveira-app's own base URL, used by the proxy to call back into Rails
+# for auth/data. Matches codeveira-app's fixed Service name by default.
+appUrl: "http://app:3000"
+
+# Shared secret the proxy sends as X-Internal-Secret on every call to Rails.
+# Optional -- blank leaves the proxy locked to its restricted/no-IPs-allowed
+# default (it logs a startup warning in that case). Must match
+# codeveira-app's and codeveira-sidekiq's integrations.lspProxySharedSecret
+# (or set once via global.integrations.lspProxySharedSecret).
+sharedSecret: ""
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
