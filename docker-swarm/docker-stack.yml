@@ -1,0 +1,634 @@
+# Docker Swarm stack — an additive alternative to ../docker-compose.yml, not a
+# replacement for it. Deploy with `docker stack deploy`, not `docker compose`.
+# See README.md in this directory before using this in production: node
+# labeling requirements, what this genuinely gives you over plain Compose
+# (built-in zero-downtime rolling updates, real horizontal scaling for the
+# stateless analysis workers), and — importantly — what it does NOT give you
+# (this is not high availability; see the "Not HA" section).
+#
+# Two placement groups:
+#   - "primary" (node.labels.codeveira.role == primary): db, redis, app,
+#     sidekiq, nginx, and semantic-analysis-php-proxy. These either hold state
+#     directly (db/redis) or share a `local`-driver volume with something that
+#     does (app_storage, nginx_certs/nginx_conf/acme_webroot, and the dynamic
+#     php_composer_proxy_filter list ComposerProxyFilter writes from app/
+#     sidekiq and semantic-analysis-php-proxy reads) — `local` volumes are
+#     per-node, not cluster-shared, so anything touching one of these must be
+#     pinned to the same node the volume's data actually lives on. Label
+#     exactly one node before deploying:
+#       docker node update --label-add codeveira.role=primary <NODE>
+#   - Everything else (indexer, lint-runner, lsp, and the other 15
+#     semantic-analysis-*/*-proxy services) has no cross-node state and is
+#     left unconstrained — Swarm is free to spread it across every node in
+#     the cluster, including the primary. A single-node Swarm (one manager,
+#     no workers) is a perfectly valid way to run this stack too; the
+#     unconstrained services simply all land on that one node.
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: codereview
+      POSTGRES_USER: codereview
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
+    volumes:
+      - ${CODEVEIRA_DATA_DIR:?CODEVEIRA_DATA_DIR must be set}/pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codereview"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.labels.codeveira.role == primary]
+      restart_policy:
+        condition: any
+
+  redis:
+    image: valkey/valkey:9-alpine
+    volumes:
+      - ${CODEVEIRA_DATA_DIR}/redis:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.labels.codeveira.role == primary]
+      restart_policy:
+        condition: any
+
+  # No `ports:` here on purpose — the bundled `nginx` service (below) is the
+  # only published entry point, same reasoning as docker-compose.yml.
+  #
+  # depends_on's `condition: service_healthy` from the Compose file is
+  # dropped here — Swarm parses depends_on for informational ordering only,
+  # it never gates a task's start on another service's health check the way
+  # `docker compose up` does. This is not a gap in practice: entrypoint.sh's
+  # own `until pg_isready ...` loop already blocks app/sidekiq's boot on the
+  # database being reachable regardless of orchestrator, and Redis
+  # unreachability is handled the normal way any of this app's Redis clients
+  # handle it — the task fails to become healthy, `restart_policy: any`
+  # brings it back, repeat until Redis answers.
+  app:
+    image: ghcr.io/codeveira/codeveira:${IMAGE_TAG:-latest}
+    environment:
+      RAILS_ENV: production
+      RAILS_LOG_TO_STDOUT: "true"
+      RAILS_SERVE_STATIC_FILES: "true"
+      DATABASE_URL: postgresql://codereview:${DB_PASSWORD:?DB_PASSWORD must be set}@db/codereview
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY: ${ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY}
+      ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY: ${ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY}
+      ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT: ${ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT}
+      APP_HOST: ${APP_HOST}
+      FORCE_SSL: ${FORCE_SSL:-true}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
+      GITLAB_URL: ${GITLAB_URL}
+      GITLAB_APP_ID: ${GITLAB_APP_ID}
+      GITLAB_APP_SECRET: ${GITLAB_APP_SECRET}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_APP_ID: ${GITHUB_APP_ID}
+      GITHUB_APP_SECRET: ${GITHUB_APP_SECRET}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET}
+      GITEA_URL: ${GITEA_URL}
+      GITEA_WEBHOOK_SECRET: ${GITEA_WEBHOOK_SECRET}
+      BITBUCKET_WEBHOOK_SECRET: ${BITBUCKET_WEBHOOK_SECRET}
+      BITBUCKET_SERVER_WEBHOOK_SECRET: ${BITBUCKET_SERVER_WEBHOOK_SECRET}
+      AZURE_WEBHOOK_SECRET: ${AZURE_WEBHOOK_SECRET}
+      GERRIT_WEBHOOK_SECRET: ${GERRIT_WEBHOOK_SECRET}
+      LSP_PROXY_SHARED_SECRET: ${LSP_PROXY_SHARED_SECRET:-}
+      INBOUND_EMAIL_DOMAIN: ${INBOUND_EMAIL_DOMAIN:-}
+      RAILS_INBOUND_EMAIL_PASSWORD: ${RAILS_INBOUND_EMAIL_PASSWORD:-}
+      LDAP_HOST: ${LDAP_HOST}
+      LDAP_PORT: ${LDAP_PORT:-389}
+      LDAP_SSL: ${LDAP_SSL:-false}
+      LDAP_BASE: ${LDAP_BASE}
+      LDAP_BIND_DN: ${LDAP_BIND_DN}
+      LDAP_PASSWORD: ${LDAP_PASSWORD}
+      LDAP_DOMAIN: ${LDAP_DOMAIN}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      SYMBOL_INDEXER_URL: http://indexer:8090
+      SYMBOL_INDEXER_TOKEN: ${SYMBOL_INDEXER_TOKEN:-}
+      LINT_RUNNER_URL: http://lint-runner:8091
+      LINT_RUNNER_TOKEN: ${LINT_RUNNER_TOKEN:-}
+    volumes:
+      - app_storage:/app/storage
+      - ${CODEVEIRA_DATA_DIR}/backup:/backups
+      - nginx_certs:/etc/letsencrypt
+      - nginx_conf:/etc/nginx/conf.d
+      - acme_webroot:/var/www/acme-challenge
+      - php_composer_proxy_filter:/app/tmp/php_proxy_filter
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/up || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    deploy:
+      replicas: ${APP_REPLICAS:-1}
+      placement:
+        constraints: [node.labels.codeveira.role == primary]
+      # This is the actual zero-downtime-upgrade win over plain Compose:
+      # `order: start-first` boots the new task and waits for it to pass the
+      # healthcheck above before stopping the old one, natively — no
+      # rollout.sh, no manual --scale dance. `monitor` gives the new task
+      # this long to prove healthy before Swarm moves to the next replica
+      # (or rolls back, since failure_action is set below); this mirrors
+      # rollout.sh's own HEALTH_TIMEOUT_SECONDS default of 120s.
+      update_config:
+        order: start-first
+        failure_action: rollback
+        monitor: 120s
+      rollback_config:
+        order: stop-first
+      restart_policy:
+        condition: any
+
+  indexer:
+    image: ghcr.io/codeveira/codeveira-indexer:${IMAGE_TAG:-latest}
+    environment:
+      INDEXER_PORT: 8090
+      MAX_FILE_SIZE_BYTES: "2000000"
+      INDEXER_TOKEN: ${SYMBOL_INDEXER_TOKEN:-}
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          memory: ${INDEXER_MEM_LIMIT:-768m}
+          cpus: "${INDEXER_CPUS:-1.0}"
+
+  lint-runner:
+    image: ghcr.io/codeveira/codeveira-lint-runner:${IMAGE_TAG:-latest}
+    environment:
+      LINT_RUNNER_PORT: 8091
+      MAX_FILE_SIZE_BYTES: "2000000"
+      LINT_RUNNER_TOKEN: ${LINT_RUNNER_TOKEN:-}
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          memory: ${LINT_RUNNER_MEM_LIMIT:-768m}
+          cpus: "${LINT_RUNNER_CPUS:-1.0}"
+
+  # Enterprise-only, opt-in per repository. No shared state with anything
+  # else — free to land on any node, including a different one than its own
+  # proxy sibling (they only ever talk to each other over the overlay
+  # network semantic_analysis_net, which is cluster-wide by design).
+  semantic-analysis:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis:${IMAGE_TAG:-latest}
+    volumes:
+      - semantic_analysis_go_mod:/home/analyzer/go/pkg/mod
+    environment:
+      SEMANTIC_ANALYSIS_TOKEN: ${SEMANTIC_ANALYSIS_TOKEN:-}
+      SEMANTIC_ANALYSIS_CACHE_MAX_MB: ${SEMANTIC_ANALYSIS_CACHE_MAX_MB:-}
+      HTTP_PROXY: http://semantic-analysis-proxy:8888
+      HTTPS_PROXY: http://semantic-analysis-proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+    networks:
+      - semantic_analysis_net
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          memory: ${SEMANTIC_ANALYSIS_MEM_LIMIT:-1536m}
+          cpus: "${SEMANTIC_ANALYSIS_CPUS:-1.5}"
+
+  semantic-analysis-proxy:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-proxy:${IMAGE_TAG:-latest}
+    networks:
+      - default
+      - semantic_analysis_net
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+
+  semantic-analysis-ts:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-ts:${IMAGE_TAG:-latest}
+    volumes:
+      - semantic_analysis_ts_npm:/home/analyzer/.npm
+    environment:
+      SEMANTIC_ANALYSIS_TS_TOKEN: ${SEMANTIC_ANALYSIS_TS_TOKEN:-}
+      SEMANTIC_ANALYSIS_TS_CACHE_MAX_MB: ${SEMANTIC_ANALYSIS_TS_CACHE_MAX_MB:-}
+      HTTP_PROXY: http://semantic-analysis-ts-proxy:8888
+      HTTPS_PROXY: http://semantic-analysis-ts-proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+    networks:
+      - semantic_analysis_ts_net
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          memory: ${SEMANTIC_ANALYSIS_TS_MEM_LIMIT:-1536m}
+          cpus: "${SEMANTIC_ANALYSIS_TS_CPUS:-1.5}"
+
+  semantic-analysis-ts-proxy:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-ts-proxy:${IMAGE_TAG:-latest}
+    networks:
+      - default
+      - semantic_analysis_ts_net
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+
+  semantic-analysis-py:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-py:${IMAGE_TAG:-latest}
+    volumes:
+      - semantic_analysis_py_pip:/home/analyzer/.cache/pip
+    environment:
+      SEMANTIC_ANALYSIS_PY_TOKEN: ${SEMANTIC_ANALYSIS_PY_TOKEN:-}
+      SEMANTIC_ANALYSIS_PY_CACHE_MAX_MB: ${SEMANTIC_ANALYSIS_PY_CACHE_MAX_MB:-}
+      HTTP_PROXY: http://semantic-analysis-py-proxy:8888
+      HTTPS_PROXY: http://semantic-analysis-py-proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+    networks:
+      - semantic_analysis_py_net
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          memory: ${SEMANTIC_ANALYSIS_PY_MEM_LIMIT:-1536m}
+          cpus: "${SEMANTIC_ANALYSIS_PY_CPUS:-1.5}"
+
+  semantic-analysis-py-proxy:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-py-proxy:${IMAGE_TAG:-latest}
+    networks:
+      - default
+      - semantic_analysis_py_net
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+
+  semantic-analysis-java:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-java:${IMAGE_TAG:-latest}
+    volumes:
+      - semantic_analysis_java_m2:/home/analyzer/.m2/repository
+    environment:
+      SEMANTIC_ANALYSIS_JAVA_TOKEN: ${SEMANTIC_ANALYSIS_JAVA_TOKEN:-}
+      SEMANTIC_ANALYSIS_JAVA_CACHE_MAX_MB: ${SEMANTIC_ANALYSIS_JAVA_CACHE_MAX_MB:-}
+      HTTP_PROXY: http://semantic-analysis-java-proxy:8888
+      HTTPS_PROXY: http://semantic-analysis-java-proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+    networks:
+      - semantic_analysis_java_net
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          memory: ${SEMANTIC_ANALYSIS_JAVA_MEM_LIMIT:-1536m}
+          cpus: "${SEMANTIC_ANALYSIS_JAVA_CPUS:-1.5}"
+
+  semantic-analysis-java-proxy:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-java-proxy:${IMAGE_TAG:-latest}
+    networks:
+      - default
+      - semantic_analysis_java_net
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+
+  semantic-analysis-kt:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-kt:${IMAGE_TAG:-latest}
+    volumes:
+      - semantic_analysis_kt_m2:/home/analyzer/.m2/repository
+    environment:
+      SEMANTIC_ANALYSIS_KT_TOKEN: ${SEMANTIC_ANALYSIS_KT_TOKEN:-}
+      SEMANTIC_ANALYSIS_KT_CACHE_MAX_MB: ${SEMANTIC_ANALYSIS_KT_CACHE_MAX_MB:-}
+      HTTP_PROXY: http://semantic-analysis-kt-proxy:8888
+      HTTPS_PROXY: http://semantic-analysis-kt-proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+    networks:
+      - semantic_analysis_kt_net
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          memory: ${SEMANTIC_ANALYSIS_KT_MEM_LIMIT:-1536m}
+          cpus: "${SEMANTIC_ANALYSIS_KT_CPUS:-1.5}"
+
+  semantic-analysis-kt-proxy:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-kt-proxy:${IMAGE_TAG:-latest}
+    networks:
+      - default
+      - semantic_analysis_kt_net
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+
+  semantic-analysis-php:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-php:${IMAGE_TAG:-latest}
+    volumes:
+      - semantic_analysis_php_composer:/home/analyzer/.cache/composer
+    environment:
+      SEMANTIC_ANALYSIS_PHP_TOKEN: ${SEMANTIC_ANALYSIS_PHP_TOKEN:-}
+      SEMANTIC_ANALYSIS_PHP_CACHE_MAX_MB: ${SEMANTIC_ANALYSIS_PHP_CACHE_MAX_MB:-}
+      HTTP_PROXY: http://semantic-analysis-php-proxy:8888
+      HTTPS_PROXY: http://semantic-analysis-php-proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+    networks:
+      - semantic_analysis_php_net
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          memory: ${SEMANTIC_ANALYSIS_PHP_MEM_LIMIT:-1024m}
+          cpus: "${SEMANTIC_ANALYSIS_PHP_CPUS:-1.0}"
+
+  # Unlike its 7 sibling proxies, this one is pinned to the primary node: it
+  # mounts php_composer_proxy_filter, the same `local`-driver volume `app`/
+  # `sidekiq` write the dynamic Composer egress allow-list into
+  # (ComposerProxyFilter/RegenerateComposerProxyFilterJob). `local` volumes
+  # are per-node — if this task floated to a different node it would get its
+  # own empty volume instead of the one app/sidekiq actually write to, and
+  # the allow-list would silently stay empty forever (every self-hosted-VCS
+  # Composer package resolution would fail with no explanation). Keep this
+  # constraint even if you don't use Semantic Analysis for PHP.
+  semantic-analysis-php-proxy:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-php-proxy:${IMAGE_TAG:-latest}
+    volumes:
+      - php_composer_proxy_filter:/etc/tinyproxy/dynamic
+    networks:
+      - default
+      - semantic_analysis_php_net
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.labels.codeveira.role == primary]
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+
+  semantic-analysis-csharp:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-csharp:${IMAGE_TAG:-latest}
+    volumes:
+      - semantic_analysis_csharp_nuget:/home/analyzer/.nuget/packages
+    environment:
+      SEMANTIC_ANALYSIS_CSHARP_TOKEN: ${SEMANTIC_ANALYSIS_CSHARP_TOKEN:-}
+      SEMANTIC_ANALYSIS_CSHARP_CACHE_MAX_MB: ${SEMANTIC_ANALYSIS_CSHARP_CACHE_MAX_MB:-}
+      HTTP_PROXY: http://semantic-analysis-csharp-proxy:8888
+      HTTPS_PROXY: http://semantic-analysis-csharp-proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+    networks:
+      - semantic_analysis_csharp_net
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          memory: ${SEMANTIC_ANALYSIS_CSHARP_MEM_LIMIT:-1536m}
+          cpus: "${SEMANTIC_ANALYSIS_CSHARP_CPUS:-1.5}"
+
+  semantic-analysis-csharp-proxy:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-csharp-proxy:${IMAGE_TAG:-latest}
+    networks:
+      - default
+      - semantic_analysis_csharp_net
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+
+  semantic-analysis-ruby:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-ruby:${IMAGE_TAG:-latest}
+    volumes:
+      - semantic_analysis_ruby_bundle:/home/analyzer/.cache/bundle
+    environment:
+      SEMANTIC_ANALYSIS_RUBY_TOKEN: ${SEMANTIC_ANALYSIS_RUBY_TOKEN:-}
+      SEMANTIC_ANALYSIS_RUBY_CACHE_MAX_MB: ${SEMANTIC_ANALYSIS_RUBY_CACHE_MAX_MB:-}
+      HTTP_PROXY: http://semantic-analysis-ruby-proxy:8888
+      HTTPS_PROXY: http://semantic-analysis-ruby-proxy:8888
+      NO_PROXY: localhost,127.0.0.1
+    networks:
+      - semantic_analysis_ruby_net
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          memory: ${SEMANTIC_ANALYSIS_RUBY_MEM_LIMIT:-1536m}
+          cpus: "${SEMANTIC_ANALYSIS_RUBY_CPUS:-1.5}"
+
+  semantic-analysis-ruby-proxy:
+    image: ghcr.io/codeveira/codeveira-semantic-analysis-ruby-proxy:${IMAGE_TAG:-latest}
+    networks:
+      - default
+      - semantic_analysis_ruby_net
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+
+  # No `ports:` here either — nginx's stream {} block proxies host port 7777
+  # to this service. No volumes, no shared state — free to float, same as
+  # the semantic-analysis-* workers.
+  lsp:
+    image: ghcr.io/codeveira/codeveira-lsp:${IMAGE_TAG:-latest}
+    environment:
+      CODEVEIRA_URL: http://app:3000
+      LSP_PORT: 7777
+      LSP_PROXY_SHARED_SECRET: ${LSP_PROXY_SHARED_SECRET:-}
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+
+  sidekiq:
+    image: ghcr.io/codeveira/codeveira:${IMAGE_TAG:-latest}
+    command: bundle exec sidekiq -C config/sidekiq.yml
+    environment:
+      RAILS_ENV: production
+      DATABASE_URL: postgresql://codereview:${DB_PASSWORD:?DB_PASSWORD must be set}@db/codereview
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY: ${ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY}
+      ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY: ${ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY}
+      ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT: ${ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT}
+      APP_HOST: ${APP_HOST}
+      GITLAB_URL: ${GITLAB_URL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      INBOUND_EMAIL_DOMAIN: ${INBOUND_EMAIL_DOMAIN:-}
+      RAILS_INBOUND_EMAIL_PASSWORD: ${RAILS_INBOUND_EMAIL_PASSWORD:-}
+      SYMBOL_INDEXER_URL: http://indexer:8090
+      SYMBOL_INDEXER_TOKEN: ${SYMBOL_INDEXER_TOKEN:-}
+      LINT_RUNNER_URL: http://lint-runner:8091
+      LINT_RUNNER_TOKEN: ${LINT_RUNNER_TOKEN:-}
+      SEMANTIC_ANALYSIS_URL: http://semantic-analysis:8092
+      SEMANTIC_ANALYSIS_TOKEN: ${SEMANTIC_ANALYSIS_TOKEN:-}
+      SEMANTIC_ANALYSIS_TS_URL: http://semantic-analysis-ts:8093
+      SEMANTIC_ANALYSIS_TS_TOKEN: ${SEMANTIC_ANALYSIS_TS_TOKEN:-}
+      SEMANTIC_ANALYSIS_PY_URL: http://semantic-analysis-py:8094
+      SEMANTIC_ANALYSIS_PY_TOKEN: ${SEMANTIC_ANALYSIS_PY_TOKEN:-}
+      SEMANTIC_ANALYSIS_JAVA_URL: http://semantic-analysis-java:8095
+      SEMANTIC_ANALYSIS_JAVA_TOKEN: ${SEMANTIC_ANALYSIS_JAVA_TOKEN:-}
+      SEMANTIC_ANALYSIS_KT_URL: http://semantic-analysis-kt:8096
+      SEMANTIC_ANALYSIS_KT_TOKEN: ${SEMANTIC_ANALYSIS_KT_TOKEN:-}
+      SEMANTIC_ANALYSIS_PHP_URL: http://semantic-analysis-php:8097
+      SEMANTIC_ANALYSIS_PHP_TOKEN: ${SEMANTIC_ANALYSIS_PHP_TOKEN:-}
+      SEMANTIC_ANALYSIS_CSHARP_URL: http://semantic-analysis-csharp:8098
+      SEMANTIC_ANALYSIS_CSHARP_TOKEN: ${SEMANTIC_ANALYSIS_CSHARP_TOKEN:-}
+      SEMANTIC_ANALYSIS_RUBY_URL: http://semantic-analysis-ruby:8099
+      SEMANTIC_ANALYSIS_RUBY_TOKEN: ${SEMANTIC_ANALYSIS_RUBY_TOKEN:-}
+    networks:
+      - default
+      - semantic_analysis_net
+      - semantic_analysis_ts_net
+      - semantic_analysis_py_net
+      - semantic_analysis_java_net
+      - semantic_analysis_kt_net
+      - semantic_analysis_php_net
+      - semantic_analysis_csharp_net
+      - semantic_analysis_ruby_net
+    volumes:
+      - ${CODEVEIRA_DATA_DIR}/backup:/backups
+      - nginx_certs:/etc/letsencrypt
+      - nginx_conf:/etc/nginx/conf.d
+      - acme_webroot:/var/www/acme-challenge
+      - php_composer_proxy_filter:/app/tmp/php_proxy_filter
+    deploy:
+      replicas: ${SIDEKIQ_REPLICAS:-1}
+      placement:
+        constraints: [node.labels.codeveira.role == primary]
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+
+  # Reverse proxy + TLS termination. Boots with a zero-config self-signed
+  # certificate; configure a real domain and issue/upload a certificate from
+  # Settings → Domain & HTTPS once the app is running — that flow writes into
+  # nginx_certs/nginx_conf from `app`/`sidekiq`, which is why nginx is pinned
+  # to the same primary node as them (see the top-of-file note).
+  nginx:
+    image: ghcr.io/codeveira/codeveira-nginx:${IMAGE_TAG:-latest}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "${LSP_PORT:-7777}:7777"
+    volumes:
+      - nginx_certs:/etc/letsencrypt
+      - nginx_conf:/etc/nginx/conf.d
+      - acme_webroot:/var/www/acme-challenge
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.labels.codeveira.role == primary]
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+
+networks:
+  default:
+    driver: overlay
+  semantic_analysis_net:
+    driver: overlay
+    internal: true
+  semantic_analysis_ts_net:
+    driver: overlay
+    internal: true
+  semantic_analysis_py_net:
+    driver: overlay
+    internal: true
+  semantic_analysis_java_net:
+    driver: overlay
+    internal: true
+  semantic_analysis_kt_net:
+    driver: overlay
+    internal: true
+  semantic_analysis_php_net:
+    driver: overlay
+    internal: true
+  semantic_analysis_csharp_net:
+    driver: overlay
+    internal: true
+  semantic_analysis_ruby_net:
+    driver: overlay
+    internal: true
+
+volumes:
+  app_storage:
+  nginx_certs:
+  nginx_conf:
+  acme_webroot:
+  php_composer_proxy_filter:
+  semantic_analysis_go_mod:
+  semantic_analysis_ts_npm:
+  semantic_analysis_py_pip:
+  semantic_analysis_java_m2:
+  semantic_analysis_kt_m2:
+  semantic_analysis_php_composer:
+  semantic_analysis_csharp_nuget:
+  semantic_analysis_ruby_bundle:

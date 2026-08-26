@@ -65,6 +65,18 @@ This needs the bundled nginx in front, since it relies on scaling `app` to two c
 
 Prefer Kubernetes over docker-compose? See [`helm/codeveira/README.md`](helm/codeveira/README.md) for an MVP Helm deployment (app, sidekiq, postgresql, redis, native `Ingress` + `cert-manager`) — every service is its own subchart. `Deployment` rolling updates + the same `/up` readiness probe `rollout.sh` polls above give you zero-downtime rollouts natively there, so `rollout.sh`/`make rollout` are docker-compose-only and not needed under Kubernetes. Settings → Domain & HTTPS is hidden automatically in that deployment mode, since `cert-manager` owns certificate issuance/renewal at the cluster level instead.
 
+## Docker Swarm
+
+Already running (or want) a Docker Swarm cluster instead of a single Compose host? See
+[`docker-swarm/README.md`](docker-swarm/README.md) for a full stack (`docker stack deploy`, pre-built
+images, no `build:` contexts) covering every service in this compose file. It gives you native
+zero-downtime rolling updates (`deploy.update_config: order: start-first`, replacing `rollout.sh`) and
+lets you horizontally scale the stateless workers (`app`, `sidekiq`, `indexer`, `lint-runner`, `lsp`, and
+15 of the 16 `semantic-analysis-*` services) across multiple nodes. It is **not** high availability —
+`db`, `redis`, `nginx`, and the state-touching services stay pinned to a single "primary" node, same
+single point of failure as this Compose deployment — see that README's "What you do NOT get" section for
+the full, honest breakdown before relying on it.
+
 ## Pinning a version
 
 ```bash
@@ -281,6 +293,12 @@ Configure under **Settings → Semantic Search**: point it at a self-hosted **Ol
 
 Every function/method-sized definition the tree-sitter indexer already extracts gets embedded after each push (async, so a slow embeddings API never blocks push processing). Search results rank by cosine similarity — computed in Ruby against the existing `symbol_definitions` table, no pgvector extension or separate vector database required. Runs across every branch that's been embedded for a repository, not just its default branch.
 
+## Company Standards (Standard+)
+
+A lightweight RAG layer for the AI reviewer, on top of Semantic Search above: teach it your team's own conventions ("business logic belongs in service objects, not fat controllers"), not just generic per-language best practice.
+
+Add standards at **Settings → Company Standards** — a title and a free-text body. Each one is embedded the same way indexed code is, reusing Semantic Search's Ollama endpoint and enable toggle, so it needs zero separate configuration once Semantic Search above is set up. On every AI review, the diff's added lines are embedded and matched against your standards library; the top 3 matches above a similarity floor are injected into the reviewer's prompt automatically, with the matching standard's title referenced when a finding is based on it. A standard's embedding is recomputed automatically whenever its body is edited.
+
 ## Global Search (Cmd+K)
 
 Press **⌘K** (Mac) or **Ctrl+K** (Windows/Linux) anywhere to open a search overlay. Searches repositories by name, reviews by title or CR number, and commits by SHA prefix. Navigate results with arrow keys, confirm with Enter, close with Esc.
@@ -302,7 +320,7 @@ The button is hidden for deleted files (they no longer exist at that SHA).
 
 - **@mention** a user in any comment body to send them an immediate in-app + email notification.
 - Users can opt into a **daily digest** in Profile → Notifications instead of per-event emails.
-- **Reply by email** — set `INBOUND_EMAIL_DOMAIN` in `.env` and configure MX. Replying to a notification email posts a comment directly on the review.
+- **Reply by email** — set `INBOUND_EMAIL_DOMAIN` in `.env` and configure MX. Replying to a notification email posts a comment directly on the review. Bounced/rejected inbound emails (unknown token, malformed message, etc.) are logged with a specific reason (`[ReplyMailbox] bounced: ...` / `[PatchSubmissionMailbox] bounced: ...`), so a spike in a particular bounce reason is greppable/alertable via the Loki stack under Monitoring below instead of showing up only as a silent drop.
 
 ## Documentation
 
@@ -373,7 +391,7 @@ One-time setup:
 
 Grafana comes up at `:3001` (`admin` / `GRAFANA_ADMIN_PASSWORD`) with two dashboards already provisioned — no manual datasource or import step:
 
-- **Codeveira — Review Health & Bottlenecks** — review throughput, cycle time, and per-reviewer bottleneck detection (who's got a backlog, whose assignments have sat pending >7 days, assignment→decision time), from the `/metrics` endpoint above.
+- **Codeveira — Review Health & Bottlenecks** — review throughput, cycle time, and per-reviewer bottleneck detection (who's got a backlog, whose assignments have sat pending >7 days, assignment→decision time), plus a **Tech Debt Findings** panel group (by kind, by repository, and a 7-day trend) tracking what Architectural Lint/Duplicate Code Detection/Dead Symbol Detection/Semantic Duplicate Detection have flagged over time — all from the `/metrics` endpoint above, no new scrape target.
 - **Nginx — Connections & Security** — who's connecting to the instance and any failed/suspicious requests by IP (a spike of 404s/401s from one address is what a scan or brute-force attempt looks like here), sourced from nginx's own access log via Loki rather than a Prometheus metric — client IP is unbounded-cardinality data, so it's shipped as logs, not a label.
 
 Prometheus itself is exposed at `:9090` for ad-hoc queries. Loki/Promtail have no exposed ports — Grafana talks to them over the internal Docker network only.
