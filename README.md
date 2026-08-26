@@ -299,6 +299,8 @@ A lightweight RAG layer for the AI reviewer, on top of Semantic Search above: te
 
 Add standards at **Settings → Company Standards** — a title and a free-text body. Each one is embedded the same way indexed code is, reusing Semantic Search's Ollama endpoint and enable toggle, so it needs zero separate configuration once Semantic Search above is set up. On every AI review, the diff's added lines are embedded and matched against your standards library; the top 3 matches above a similarity floor are injected into the reviewer's prompt automatically, with the matching standard's title referenced when a finding is based on it. A standard's embedding is recomputed automatically whenever its body is edited.
 
+**Promote a comment to a standard:** any comment has an admin-only "Promote to Standard" link that drafts a new standard from that comment's text, its suggested fix (if any), and an attribution line back to the review — review and edit the draft before saving, nothing is created automatically. Turns a fix made once into something the AI reviewer surfaces on similar diffs everywhere else.
+
 ## Global Search (Cmd+K)
 
 Press **⌘K** (Mac) or **Ctrl+K** (Windows/Linux) anywhere to open a search overlay. Searches repositories by name, reviews by title or CR number, and commits by SHA prefix. Navigate results with arrow keys, confirm with Enter, close with Esc.
