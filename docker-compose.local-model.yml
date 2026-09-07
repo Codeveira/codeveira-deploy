@@ -28,7 +28,7 @@
 # host): uncomment the `deploy.resources.reservations.devices` block below.
 services:
   ollama:
-    image: ollama/ollama:0.16.4
+    image: ollama/ollama:0.33.0
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped
