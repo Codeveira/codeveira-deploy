@@ -90,9 +90,9 @@ Codeveira is **free for any number of users** — no license key required (local
 | Tier       | Price          | Users     | Key features                                                                  |
 |------------|----------------|-----------|-------------------------------------------------------------------------------|
 | Free       | $0             | Unlimited | Core review, 1 local AI bot, email notifications, IDE diagnostics, configurable dashboard |
-| Standard   | $10/user/mo    | Unlimited | Cloud AI providers, Compare (file-to-file & full-repo diff), Teams (cross-repo rollups for leads), Slack/Teams/Email/Webhook/SMS notifications, native Task Trackers (YouTrack/Jira/Mantis/Bugzilla), task tracker merge gate, reviewer auto-assignment by load, bus factor guard, REST API, Backup, 2FA, review watchers, Migration Safety Analyzer, Secret Scanning, Semantic Duplicate Detection, Dead Symbol Detection |
-| Extended   | $14/user/mo    | Unlimited | Multiple AI bots, Autofix, AI suggestion suppression/learning, PR mode (GitLab/GitHub/Gitea/Forgejo/Bitbucket/Bitbucket Server/Azure DevOps/Gerrit), Email/Patch reviews (`git send-email`), LDAP/AD, Audit log, Prometheus metrics |
-| Enterprise | $16/user/mo    | Unlimited | All features + Upsource import + audit log export/SIEM + CI status badge + CI flakiness detection + CI/SAST merge gate + real semantic analysis (Go, TypeScript, Python, Java, Kotlin, PHP, C# & Ruby) + stacked diffs |
+| Standard   | $10/user/mo    | No cap — billed per user | Cloud AI providers, Compare (file-to-file & full-repo diff), Teams (cross-repo rollups for leads), Slack/Teams/Email/Webhook/SMS notifications, native Task Trackers (YouTrack/Jira/Mantis/Bugzilla), task tracker merge gate, reviewer auto-assignment by load, bus factor guard, REST API, Backup, 2FA, review watchers, Migration Safety Analyzer, Secret Scanning, Semantic Duplicate Detection, Dead Symbol Detection |
+| Extended   | $14/user/mo    | No cap — billed per user | Multiple AI bots, Autofix, AI suggestion suppression/learning, PR mode (GitLab/GitHub/Gitea/Forgejo/Bitbucket/Bitbucket Server/Azure DevOps/Gerrit), Email/Patch reviews (`git send-email`), LDAP/AD, Audit log, Prometheus metrics |
+| Enterprise | $16/user/mo    | No cap — billed per user | All features + Upsource import + audit log export/SIEM + CI status badge + CI flakiness detection + CI/SAST merge gate + real semantic analysis (Go, TypeScript, Python, Java, Kotlin, PHP, C# & Ruby) + stacked diffs |
 
 To purchase a license: **hello@codeveira.com**
 
