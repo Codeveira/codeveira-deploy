@@ -21,6 +21,21 @@
 #
 #     Prerequisite: nginx built with --with-stream (nginx-full on Debian/Ubuntu).
 #     Check: nginx -V 2>&1 | grep -- '--with-stream'
+#
+#  IMPORTANT: the `location /` block below proxies ActionCable's /cable
+#  WebSocket endpoint too, not just plain HTTP — without the Upgrade/
+#  Connection headers it needs, ordinary page loads still work (nothing
+#  looks broken), but Turbo Stream broadcasts — live reviewer progress bars,
+#  the notification badge, etc. — never arrive; only the next full page
+#  load, which re-renders current state straight from the DB, ever shows
+#  them. Add this to your OWN nginx.conf's http {} block once (same
+#  top-level place the stream {} block goes, but this goes inside http {},
+#  not alongside it):
+#
+#    map $http_upgrade $connection_upgrade {
+#      default upgrade;
+#      ''      close;
+#    }
 # ══════════════════════════════════════════════════════════════════════════════
 
 # ── HTTP → HTTPS redirect ─────────────────────────────────────────────────────
@@ -44,6 +59,9 @@ server {
 
     location / {
         proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         # Required for Audit Log real IP recording (Rails ActionDispatch::RemoteIp reads this header)
