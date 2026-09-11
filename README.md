@@ -1,5 +1,11 @@
 # Codeveira — Self-Hosted Code Review
 
+[![Docs](https://img.shields.io/badge/docs-codeveira.com-blue)](https://codeveira.com/docs/) [![Website](https://img.shields.io/badge/website-codeveira.com-blue)](https://codeveira.com) [![Pricing](https://img.shields.io/badge/pricing-from%20%240-brightgreen)](https://codeveira.com/pricing/)
+
+<img src="https://codeveira.com/favicon.svg" width="80">
+
+----
+
 > Post-commit code review platform for GitLab, GitHub, Gitea, Forgejo, Bitbucket, Azure DevOps, Gerrit, and SVN — plus Linux-kernel-style `git send-email` review with no hosted API required.  
 > The modern self-hosted alternative to JetBrains Upsource.
 
