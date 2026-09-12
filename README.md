@@ -438,3 +438,5 @@ docker compose exec redis sh -c "tar czf - -C /data ." > redis-backup-$(date +%Y
 
 - Website: [codeveira.com](https://codeveira.com)
 - Email: hello@codeveira.com
+- Privacy Policy: [codeveira.com/privacy](https://codeveira.com/privacy/)
+- Terms of Service: [codeveira.com/terms](https://codeveira.com/terms/)
