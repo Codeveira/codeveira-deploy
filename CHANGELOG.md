@@ -4,6 +4,11 @@ All notable changes to Codeveira are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **`backup.sh` / `make backup`** — snapshots Postgres (`pg_dump -Fc`, same filename convention as the in-app Backup & Restore feature) and Redis (forces a fresh `BGSAVE` before archiving `./redis`, instead of tarring whatever happened to be on disk) in one step, with its own time-based retention independent of the in-app job's Standard+-gated rotation.
+- **`upgrade.sh` / `make upgrade`** — runs `backup.sh`, then updates `app`/`sidekiq` via `rollout.sh` (or the plain path under `docker-compose.byo-proxy.yml`), then pulls and recreates every other service. Never touches `db`/`redis` images, since those are pinned independently of `${IMAGE_TAG}` and any engine-version upgrade is its own deliberate migration.
+
 ### Security
 
 - **`docker-compose.local-model.yml`'s bundled Ollama image bumped from `0.16.4` to `0.33.0`.** The old pin predated the fix for CVE-2026-7482 ("Bleeding Llama") — a critical unauthenticated heap-memory-leak vulnerability in Ollama's GGUF loader that lets an attacker extract a server's entire process memory (env vars, API keys, other users' in-flight prompts) via three unauthenticated API calls, fixed upstream in 0.17.1. Anyone running the optional local-model overlay should pull the new image (`docker compose -f docker-compose.yml -f docker-compose.local-model.yml pull ollama && ... up -d`).

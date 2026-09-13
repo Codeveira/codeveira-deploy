@@ -67,6 +67,18 @@ It starts a second `app` replica on the newly pulled image next to the running o
 
 This needs the bundled nginx in front, since it relies on scaling `app` to two containers on the same host port 3000 internally: it does not work with `docker-compose.byo-proxy.yml`, which publishes `app:3000` directly to the host (two replicas would conflict on that port). Use the plain rollout above in that setup.
 
+### One-command upgrade with backup (`upgrade.sh` / `make upgrade`)
+
+`upgrade.sh` chains the whole upgrade: it runs `backup.sh` first (see [Redis Data & Backup](#redis-data--backup) below — aborting immediately if the backup fails), then updates `app`/`sidekiq` the same way as above (zero-downtime via `rollout.sh`, or the plain path if `docker-compose.byo-proxy.yml` is detected), then pulls and recreates every remaining service (`indexer`, `lint-runner`, `lsp`, the `semantic-analysis-*` pair for each language).
+
+```bash
+./upgrade.sh
+```
+
+Or `make upgrade`. `db` and `redis` are never touched by this — their images are pinned directly in `docker-compose.yml`, not tied to `${IMAGE_TAG}`, so a routine app upgrade never bumps the database engine (a Postgres/Redis version upgrade is its own separate, deliberate migration).
+
+Everything this step 3 recreates is off the request path except one: the bundled `nginx` container. It only ever runs as a single instance here, so if its image changed, recreating it is a genuine few-second gap — the one part of this deployment mode that a same-host `docker compose` setup can't route around. Avoiding that too would need actual multi-node HA in front of nginx itself, not something this compose file (or `rollout.sh`) provides.
+
 ## Kubernetes (Helm)
 
 Prefer Kubernetes over docker-compose? See [`helm/codeveira/README.md`](helm/codeveira/README.md) for an MVP Helm deployment (app, sidekiq, postgresql, redis, native `Ingress` + `cert-manager`) — every service is its own subchart. `Deployment` rolling updates + the same `/up` readiness probe `rollout.sh` polls above give you zero-downtime rollouts natively there, so `rollout.sh`/`make rollout` are docker-compose-only and not needed under Kubernetes. Settings → Domain & HTTPS is hidden automatically in that deployment mode, since `cert-manager` owns certificate issuance/renewal at the cluster level instead.
@@ -428,11 +440,16 @@ There's no scheduled backup job for Redis, unlike the [Backup & Restore](https:/
 
 It's already persisted: the `./redis` host directory (bind-mounted, not a Docker-managed volume — same as `./pgdata` and `./backup`, so `docker compose down -v` can't take it out) survives container restarts, and Redis's default RDB snapshot policy is active out of the box. AOF is off by default, so a hard crash can lose up to the last snapshot window — in practice a handful of in-flight jobs (an unprocessed webhook, an AI review run, a symbol-indexing job for the last few commits), never committed application data.
 
-If you want a point-in-time snapshot anyway (e.g. before a risky upgrade):
+If you want a point-in-time snapshot anyway (e.g. before a risky upgrade), `backup.sh` (`make backup`) does this properly: it forces a fresh `BGSAVE` first (so the tar isn't just whatever happened to be on disk), then archives `./redis` to `./backup/redis_<timestamp>.tar.gz` — alongside a matching Postgres `pg_dump -Fc` written as `./backup/codeveira_<timestamp>.dump` (same filename convention the in-app [Backup & Restore](https://codeveira.com/docs/settings/) feature uses, so it's visible and restorable from Settings there too on a Standard+ license). Both get their own time-based retention (`BACKUP_RETENTION_DAYS`, default 14) independent of that feature's own rotation, since the in-app job only runs on a Standard+ license.
 
 ```bash
+./backup.sh
+# or the equivalent manual, single-shot commands:
+docker compose exec redis valkey-cli BGSAVE
 docker compose exec redis sh -c "tar czf - -C /data ." > redis-backup-$(date +%Y%m%d).tar.gz
 ```
+
+`upgrade.sh` (`make upgrade`, see [Zero-downtime updates](#zero-downtime-updates) above) runs `backup.sh` automatically before touching anything.
 
 ## Support
 
