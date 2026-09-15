@@ -108,6 +108,7 @@ integrations:
   bitbucketServerWebhookSecret: ""
   azureWebhookSecret: ""
   gerritWebhookSecret: ""
+  svnWebhookSecret: ""
   lspProxySharedSecret: ""
   # URLs default to codeveira-indexer/codeveira-lint-runner's fixed Service
   # names -- only relevant if you also enable those (optional, disabled by
