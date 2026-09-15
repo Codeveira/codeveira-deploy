@@ -65,7 +65,15 @@ done
 
 redis_path="$BACKUP_DIR/redis_${TIMESTAMP}.tar.gz"
 log "archiving ./redis to $redis_path ..."
-tar czf "$redis_path" -C ./redis .
+# dump.rdb is written by the valkey container's own (non-root) user at mode
+# 0600, which the invoking host user usually can't read directly off the
+# ./redis bind mount -- tar inside the container instead (docker compose
+# exec runs as root there) and stream the archive out over stdout.
+if ! docker compose exec -T redis tar czf - -C /data . > "$redis_path"; then
+  rm -f "$redis_path"
+  fail "tar of ./redis failed."
+fi
+[ -s "$redis_path" ] || { rm -f "$redis_path"; fail "Redis archive is empty."; }
 log "Redis snapshot OK ($(du -h "$redis_path" | cut -f1))."
 
 # --- Rotation ----------------------------------------------------------------
