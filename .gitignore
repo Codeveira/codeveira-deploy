@@ -2,6 +2,10 @@
 .env
 /monitoring/prometheus_token
 
+# flock target for rollout.sh/upgrade.sh's concurrent-invocation guard --
+# just an empty lock handle, never has meaningful content.
+/.deploy.lock
+
 # Database backups written by DatabaseBackupJob
 /backup/*
 !/backup/.gitkeep

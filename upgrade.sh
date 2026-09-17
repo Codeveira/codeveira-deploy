@@ -29,6 +29,17 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 log() { echo "[upgrade] $*"; }
 fail() { echo "[upgrade] ERROR: $*" >&2; exit 1; }
 
+# Same lock rollout.sh takes on its own -- acquired once here so the whole
+# 3-step upgrade is atomic against a second upgrade.sh/rollout.sh, and the
+# sentinel below tells the rollout.sh call in step 2 not to flock the same
+# fd it's already inside of (which would just be a harmless re-lock by the
+# same process, but there's no reason to rely on flock's self-reentrancy
+# behavior when a plain env var makes the intent explicit).
+LOCK_FILE="$(dirname "${BASH_SOURCE[0]}")/.deploy.lock"
+exec 9>"$LOCK_FILE"
+flock -n 9 || fail "another deploy operation (rollout.sh/upgrade.sh) is already running against this compose project -- refusing to start a second one concurrently."
+export CODEVEIRA_DEPLOY_LOCKED=1
+
 log "step 1/3: backup"
 ./backup.sh
 

@@ -32,6 +32,9 @@ log() { echo "[backup] $*"; }
 fail() { echo "[backup] ERROR: $*" >&2; exit 1; }
 
 mkdir -p "$BACKUP_DIR"
+# Dumps below contain the full Postgres database (every user's data) and the
+# raw Redis dataset -- default umask would leave them group/world-readable.
+chmod 0700 "$BACKUP_DIR"
 
 [ -n "$(docker compose ps -q db)" ] || fail "db container is not running."
 [ -n "$(docker compose ps -q redis)" ] || fail "redis container is not running."
@@ -44,6 +47,7 @@ if ! docker compose exec -T db pg_dump -U codereview -Fc codereview > "$dump_pat
   fail "pg_dump failed."
 fi
 [ -s "$dump_path" ] || { rm -f "$dump_path"; fail "pg_dump produced an empty file."; }
+chmod 0600 "$dump_path"
 log "Postgres dump OK ($(du -h "$dump_path" | cut -f1))."
 
 # --- Redis -------------------------------------------------------------------
@@ -74,6 +78,7 @@ if ! docker compose exec -T redis tar czf - -C /data . > "$redis_path"; then
   fail "tar of ./redis failed."
 fi
 [ -s "$redis_path" ] || { rm -f "$redis_path"; fail "Redis archive is empty."; }
+chmod 0600 "$redis_path"
 log "Redis snapshot OK ($(du -h "$redis_path" | cut -f1))."
 
 # --- Rotation ----------------------------------------------------------------

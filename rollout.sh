@@ -27,6 +27,20 @@ POLL_INTERVAL_SECONDS=3
 log() { echo "[rollout] $*"; }
 fail() { echo "[rollout] ERROR: $*" >&2; exit 1; }
 
+# Guards the "identify the new replica by diffing container IDs" logic below
+# against a second concurrent rollout.sh (or upgrade.sh, which calls this
+# script): two overlapping runs scaling app to 2 replicas at once would each
+# see more than one container that isn't their own "old" one, so
+# `new_container` could end up with multiple IDs and the stop/rm calls could
+# hit the wrong container. Skipped when CODEVEIRA_DEPLOY_LOCKED is already
+# set -- upgrade.sh sets it after acquiring this same lock itself, so its
+# call into rollout.sh doesn't try to flock an fd it already holds.
+if [ -z "${CODEVEIRA_DEPLOY_LOCKED:-}" ]; then
+  LOCK_FILE="$(dirname "${BASH_SOURCE[0]}")/.deploy.lock"
+  exec 9>"$LOCK_FILE"
+  flock -n 9 || fail "another deploy operation (rollout.sh/upgrade.sh) is already running against this compose project -- refusing to start a second one concurrently."
+fi
+
 if docker compose port app 3000 >/dev/null 2>&1; then
   fail "app currently publishes port 3000 to the host (docker-compose.byo-proxy.yml is in use). Scaling app to 2 replicas would conflict on that port. Use the simple rollout instead: docker compose pull && docker compose up -d && docker compose exec app rails db:migrate"
 fi
