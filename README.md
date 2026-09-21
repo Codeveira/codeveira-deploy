@@ -9,6 +9,8 @@
 > Post-commit code review platform for GitLab, GitHub, Gitea, Forgejo, Bitbucket, Azure DevOps, Gerrit, and SVN — plus Linux-kernel-style `git send-email` review with no hosted API required.  
 > The modern self-hosted alternative to JetBrains Upsource.
 
+This repo (`github.com/Codeveira/codeveira-deploy`) is the public, customer-facing home for the deployment configs — `docker-compose.yml`, the monitoring/sentinel/local-model overlays, `nginx.conf.example`, and `backup.sh`/`upgrade.sh`. The application source itself is closed-source.
+
 ## Requirements
 
 - Docker Engine 24+
