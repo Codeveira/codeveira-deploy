@@ -6,6 +6,7 @@ All notable changes to Codeveira are documented here.
 
 ### Added
 
+- **JetBrains plugin 1.0.2 in `ide-plugins/`**: a copy of the plugin download, for networks that block codeveira.com. In 1.0.2 the Repository ID is saved per project, and the Code Reviews panel shows the correct comment count.
 - **`backup.sh` / `make backup`** — snapshots Postgres (`pg_dump -Fc`, same filename convention as the in-app Backup & Restore feature) and Redis (forces a fresh `BGSAVE` before archiving `./redis`, instead of tarring whatever happened to be on disk) in one step, with its own time-based retention independent of the in-app job's Standard+-gated rotation.
 - **`upgrade.sh` / `make upgrade`** — runs `backup.sh`, then updates `app`/`sidekiq` via `rollout.sh` (or the plain path under `docker-compose.byo-proxy.yml`), then pulls and recreates every other service. Never touches `db`/`redis` images, since those are pinned independently of `${IMAGE_TAG}` and any engine-version upgrade is its own deliberate migration.
 

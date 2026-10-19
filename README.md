@@ -81,6 +81,16 @@ Or `make upgrade`. `db` and `redis` are never touched by this — their images a
 
 Everything this step 3 recreates is off the request path except one: the bundled `nginx` container. It only ever runs as a single instance here, so if its image changed, recreating it is a genuine few-second gap — the one part of this deployment mode that a same-host `docker compose` setup can't route around. Avoiding that too would need actual multi-node HA in front of nginx itself, not something this compose file (or `rollout.sh`) provides.
 
+## IDE plugins
+
+The JetBrains plugin (IntelliJ IDEA, WebStorm, PyCharm, GoLand, Rider and other JetBrains IDEs 2024.2+) is also available here, for networks that block downloads from codeveira.com:
+
+- [`ide-plugins/codeveira-jetbrains-1.0.2.zip`](ide-plugins/codeveira-jetbrains-1.0.2.zip) (67,253 bytes). Checksums are in [`ide-plugins/SHA256SUMS`](ide-plugins/SHA256SUMS).
+
+Direct download link: `https://github.com/Codeveira/codeveira-deploy/raw/main/ide-plugins/codeveira-jetbrains-1.0.2.zip`
+
+Install it in the IDE via **Settings → Plugins → ⚙ → Install Plugin from Disk…** and restart the IDE. Then configure it under **Settings → Tools → Codeveira**. The Repository ID is saved separately for each project. The VS Code extension and setup details are on the [Download page](https://codeveira.com/download/) and in the [IDE integration docs](https://codeveira.com/docs/ide-integration/).
+
 ## Kubernetes (Helm)
 
 Prefer Kubernetes over docker-compose? See [`helm/codeveira/README.md`](helm/codeveira/README.md) for an MVP Helm deployment (app, sidekiq, postgresql, redis, native `Ingress` + `cert-manager`) — every service is its own subchart. `Deployment` rolling updates + the same `/up` readiness probe `rollout.sh` polls above give you zero-downtime rollouts natively there, so `rollout.sh`/`make rollout` are docker-compose-only and not needed under Kubernetes. Settings → Domain & HTTPS is hidden automatically in that deployment mode, since `cert-manager` owns certificate issuance/renewal at the cluster level instead.
