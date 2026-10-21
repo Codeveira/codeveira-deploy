@@ -6,6 +6,8 @@ All notable changes to Codeveira are documented here.
 
 ### Added
 
+- **VS Code extension 1.1.0 in `ide-plugins/`**: reviews in the sidebar expand to each reviewer's verdict and the review's comments; add general comments and resolve or reopen comments from VS Code.
+- **JetBrains plugin 1.1.0 in `ide-plugins/`**: the Code Reviews panel shows each reviewer's verdict and the review's comments, and you can add, resolve and reopen comments from the IDE. Add Codeveira Comment lets you pick the review from a list or enter its CR ID.
 - **JetBrains plugin 1.0.2 in `ide-plugins/`**: a copy of the plugin download, for networks that block codeveira.com. In 1.0.2 the Repository ID is saved per project, and the Code Reviews panel shows the correct comment count.
 - **`backup.sh` / `make backup`** — snapshots Postgres (`pg_dump -Fc`, same filename convention as the in-app Backup & Restore feature) and Redis (forces a fresh `BGSAVE` before archiving `./redis`, instead of tarring whatever happened to be on disk) in one step, with its own time-based retention independent of the in-app job's Standard+-gated rotation.
 - **`upgrade.sh` / `make upgrade`** — runs `backup.sh`, then updates `app`/`sidekiq` via `rollout.sh` (or the plain path under `docker-compose.byo-proxy.yml`), then pulls and recreates every other service. Never touches `db`/`redis` images, since those are pinned independently of `${IMAGE_TAG}` and any engine-version upgrade is its own deliberate migration.

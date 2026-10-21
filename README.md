@@ -83,13 +83,21 @@ Everything this step 3 recreates is off the request path except one: the bundled
 
 ## IDE plugins
 
-The JetBrains plugin (IntelliJ IDEA, WebStorm, PyCharm, GoLand, Rider and other JetBrains IDEs 2024.2+) is also available here, for networks that block downloads from codeveira.com:
+The IDE plugins are also available here, for networks that block downloads from codeveira.com. Checksums are in [`ide-plugins/SHA256SUMS`](ide-plugins/SHA256SUMS).
 
-- [`ide-plugins/codeveira-jetbrains-1.0.2.zip`](ide-plugins/codeveira-jetbrains-1.0.2.zip) (67,253 bytes). Checksums are in [`ide-plugins/SHA256SUMS`](ide-plugins/SHA256SUMS).
+**JetBrains** (IntelliJ IDEA, WebStorm, PyCharm, GoLand, Rider and other JetBrains IDEs 2024.2+):
 
-Direct download link: `https://github.com/Codeveira/codeveira-deploy/raw/main/ide-plugins/codeveira-jetbrains-1.0.2.zip`
+- [`ide-plugins/codeveira-jetbrains-1.1.0.zip`](ide-plugins/codeveira-jetbrains-1.1.0.zip) (104,522 bytes)
+- Direct download link: `https://github.com/Codeveira/codeveira-deploy/raw/main/ide-plugins/codeveira-jetbrains-1.1.0.zip`
+- Install via **Settings → Plugins → ⚙ → Install Plugin from Disk…** and restart the IDE, then configure it under **Settings → Tools → Codeveira**. The Repository ID is saved separately for each project.
 
-Install it in the IDE via **Settings → Plugins → ⚙ → Install Plugin from Disk…** and restart the IDE. Then configure it under **Settings → Tools → Codeveira**. The Repository ID is saved separately for each project. The VS Code extension and setup details are on the [Download page](https://codeveira.com/download/) and in the [IDE integration docs](https://codeveira.com/docs/ide-integration/).
+**VS Code** (1.91+):
+
+- [`ide-plugins/codeveira-1.1.0.vsix`](ide-plugins/codeveira-1.1.0.vsix) (416,750 bytes)
+- Direct download link: `https://github.com/Codeveira/codeveira-deploy/raw/main/ide-plugins/codeveira-1.1.0.vsix`
+- Install via the Extensions view → **⋯ → Install from VSIX…**, or `code --install-extension codeveira-1.1.0.vsix`. Set `codeveira.url` and `codeveira.apiToken` in your User settings and `codeveira.repositoryId` in each workspace.
+
+Setup details are on the [Download page](https://codeveira.com/download/) and in the [IDE integration docs](https://codeveira.com/docs/ide-integration/).
 
 ## Kubernetes (Helm)
 
