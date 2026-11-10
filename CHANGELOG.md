@@ -4,6 +4,11 @@ All notable changes to Codeveira are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Monitoring stack: Grafana Alloy replaces Promtail**, which has had no security fixes since 2026-03-02. If you run `docker-compose.monitoring.yml`, run `docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d --remove-orphans` once to drop the old `promtail` container. Also Prometheus 3.16.0, Grafana 13.2.5, Loki 3.7.9 and, in `docker-compose.local-model.yml`, Ollama 0.40.16.
+- **SMTP options for company mail servers**: `SMTP_TLS`, `SMTP_AUTHENTICATION`, `SMTP_VERIFY_TLS` and `SMTP_DOMAIN` in `.env`.
+
 ### Added
 
 - **VS Code extension 1.1.0 in `ide-plugins/`**: reviews in the sidebar expand to each reviewer's verdict and the review's comments; add general comments and resolve or reopen comments from VS Code.

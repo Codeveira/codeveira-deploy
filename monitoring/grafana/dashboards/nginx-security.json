@@ -2,7 +2,7 @@
   "id": null,
   "uid": "codeveira-nginx-security",
   "title": "Nginx — Connections & Security",
-  "description": "Who's connecting to Codeveira and from where, plus failed/suspicious requests by IP — sourced from nginx's access log via Loki/Promtail (client IP is unbounded-cardinality data, so it lives in logs, not Prometheus labels).",
+  "description": "Who's connecting to Codeveira and from where, plus failed/suspicious requests by IP — sourced from nginx's access log via Loki/Alloy (client IP is unbounded-cardinality data, so it lives in logs, not Prometheus labels).",
   "tags": ["codeveira", "nginx", "security"],
   "timezone": "browser",
   "schemaVersion": 39,

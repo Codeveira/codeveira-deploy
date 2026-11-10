@@ -420,7 +420,7 @@ This adds a replica and three Sentinel instances (quorum 2 of 3) and points `app
 
 ## Monitoring (optional)
 
-A ready-made Prometheus + Grafana + Loki/Promtail stack, merged on top of the base compose file the same way Redis Sentinel is:
+A ready-made Prometheus + Grafana + Loki/Alloy stack, merged on top of the base compose file the same way Redis Sentinel is:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
@@ -435,7 +435,7 @@ Grafana comes up at `:3001` (`admin` / `GRAFANA_ADMIN_PASSWORD`) with two dashbo
 - **Codeveira — Review Health & Bottlenecks** — review throughput, cycle time, and per-reviewer bottleneck detection (who's got a backlog, whose assignments have sat pending >7 days, assignment→decision time), plus a **Tech Debt Findings** panel group (by kind, by repository, and a 7-day trend) tracking what Architectural Lint/Duplicate Code Detection/Dead Symbol Detection/Semantic Duplicate Detection have flagged over time — all from the `/metrics` endpoint above, no new scrape target.
 - **Nginx — Connections & Security** — who's connecting to the instance and any failed/suspicious requests by IP (a spike of 404s/401s from one address is what a scan or brute-force attempt looks like here), sourced from nginx's own access log via Loki rather than a Prometheus metric — client IP is unbounded-cardinality data, so it's shipped as logs, not a label.
 
-Prometheus itself is exposed at `:9090` for ad-hoc queries. Loki/Promtail have no exposed ports — Grafana talks to them over the internal Docker network only.
+Prometheus itself is exposed at `:9090` for ad-hoc queries. Loki and Alloy have no exposed ports — Grafana talks to them over the internal Docker network only.
 
 ## Local AI model (optional)
 

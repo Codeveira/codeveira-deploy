@@ -18,16 +18,17 @@
 # step needed. Prometheus itself is exposed at :9090 for ad-hoc queries.
 #
 # The nginx dashboard (who's connecting, failed/suspicious requests by IP) is
-# powered by Loki + Promtail, not Prometheus — client IPs are unbounded,
+# powered by Loki + Grafana Alloy, not Prometheus — client IPs are unbounded,
 # high-cardinality data that doesn't belong in a Prometheus label, so nginx's
-# access log is shipped to Loki instead and queried as logs. Promtail reads
+# access log is shipped to Loki instead and queried as logs. Alloy reads
 # the log stream straight from the `nginx` container via the Docker API (the
 # base nginx:alpine image already symlinks access.log to /dev/stdout) — no
 # nginx config change and no extra volume needed, just read-only access to
-# the Docker socket.
+# the Docker socket. (Alloy replaced Promtail here — Promtail has been EOL
+# since 2026-03-02 with no further security patches.)
 services:
   prometheus:
-    image: prom/prometheus:v3.13.2
+    image: prom/prometheus:v3.16.0
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/prometheus_token:/etc/prometheus/token:ro
@@ -37,7 +38,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:12.4.6
+    image: grafana/grafana:13.2.5
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set}
       GF_USERS_ALLOW_SIGN_UP: "false"
@@ -53,18 +54,17 @@ services:
     restart: unless-stopped
 
   loki:
-    image: grafana/loki:3.6.13
+    image: grafana/loki:3.7.9
     command: -config.file=/etc/loki/loki-config.yaml
     volumes:
       - ./monitoring/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
       - loki_data:/loki
     restart: unless-stopped
 
-  promtail:
-    image: grafana/promtail:3.6.11
-    command: -config.file=/etc/promtail/promtail-config.yaml
+  alloy:
+    image: grafana/alloy:v1.21.3
     volumes:
-      - ./monitoring/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       - loki

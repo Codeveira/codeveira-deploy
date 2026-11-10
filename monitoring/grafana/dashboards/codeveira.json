@@ -212,6 +212,48 @@
       ],
       "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } }, "overrides": [] },
       "options": { "displayMode": "gradient", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+
+    {
+      "id": 70,
+      "type": "bargauge",
+      "title": "Tech Debt Findings by Kind (last 7d)",
+      "description": "New dead-code/duplicate-code/flaky-CI bot findings posted in the last 7 days, by repository. A rising trend means debt is accumulating faster than it's being cleaned up.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "sum by (kind) (codeveira_tech_debt_findings_7d)", "refId": "A", "legendFormat": "{{kind}}", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": { "displayMode": "gradient", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 71,
+      "type": "table",
+      "title": "Tech Debt Findings by Repository (all time)",
+      "description": "Cumulative dead-code/duplicate-code/flaky-CI findings per repository — where the debt has actually piled up.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "codeveira_tech_debt_findings_total", "refId": "A", "format": "table", "instant": true }
+      ],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true }, "renameByName": { "repository": "Repository", "kind": "Kind", "Value": "Findings" } } }
+      ],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 10 }, { "color": "red", "value": 30 }] }, "custom": { "cellOptions": { "type": "color-background" } } }, "overrides": [] }
+    },
+    {
+      "id": 72,
+      "type": "timeseries",
+      "title": "Tech Debt Findings Trend (7d window, by kind)",
+      "description": "Sum across all repositories of the rolling 7-day findings count, sampled each scrape — shows whether debt is trending up or down over time.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 56 },
+      "datasource": { "type": "prometheus", "uid": "codeveira-prometheus" },
+      "targets": [
+        { "expr": "sum by (kind) (codeveira_tech_debt_findings_7d)", "refId": "A", "legendFormat": "{{kind}}" }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } }
     }
   ]
 }

@@ -121,7 +121,7 @@ configurable) to match the app's literal 3-entry default host list.
 
 `codeveira-monitoring` is a thin wrapper, not a bundled monitoring stack --
 unlike `docker-compose.monitoring.yml` (which ships its own Prometheus/
-Grafana/Loki/Promtail containers), it deploys no Prometheus/Grafana pods of
+Grafana/Loki/Alloy containers), it deploys no Prometheus/Grafana pods of
 its own. It assumes a Prometheus Operator + Grafana-with-dashboard-sidecar
 install already exists on the cluster (see Prerequisites below) and adds
 only a `ServiceMonitor` pointing Prometheus at `codeveira-app`'s `/metrics`
@@ -146,7 +146,7 @@ dashboard is a manually-synced copy of the main repo's
 `monitoring/grafana/dashboards/codeveira.json` -- see
 `charts/codeveira-monitoring/values.yaml` for the datasource-UID override
 knob. **Known limitation:** the docker-compose stack's second dashboard
-(`nginx-security.json`, Loki-based nginx access-log analysis via Promtail)
+(`nginx-security.json`, Loki-based nginx access-log analysis via Alloy)
 has no Kubernetes equivalent here, since this chart's ingress path
 (`codeveira-ingress`, native `Ingress` + `cert-manager`) has no bundled
 nginx container to scrape logs from in the first place.

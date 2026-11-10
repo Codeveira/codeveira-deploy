@@ -1,0 +1,84 @@
+// Grafana Alloy replacement for Promtail (EOL since 2026-03-02, no further
+// security patches). Ships nginx's access log to Loki -- same source, same
+// parsing, same label/structured-metadata split as the old Promtail config
+// it replaces (see git history for monitoring/promtail/promtail-config.yaml).
+// Generated via `alloy convert --source-format=promtail`, hand-verified
+// against the original config rather than a from-scratch rewrite.
+
+discovery.docker "nginx" {
+	host             = "unix:///var/run/docker.sock"
+	refresh_interval = "15s"
+
+	filter {
+		name   = "name"
+		values = ["codereview-nginx-1"]
+	}
+}
+
+discovery.relabel "nginx" {
+	targets = []
+
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		target_label  = "container"
+	}
+
+	rule {
+		target_label = "job"
+		replacement  = "nginx"
+	}
+}
+
+loki.source.docker "nginx" {
+	host             = "unix:///var/run/docker.sock"
+	targets          = discovery.docker.nginx.targets
+	forward_to       = [loki.process.nginx.receiver]
+	relabel_rules    = discovery.relabel.nginx.rules
+	refresh_interval = "15s"
+}
+
+loki.process "nginx" {
+	forward_to = [loki.write.default.receiver]
+
+	// Matches nginx.conf's `log_format main`. `path` deliberately stops at
+	// the first "?" and drops the query string rather than capturing the
+	// raw \S+ through to the HTTP version: Devise's password-reset/
+	// confirmation/unlock links (and any other capability-bearing GET link)
+	// carry their one-time token as a query param, e.g.
+	// "/users/password/edit?reset_password_token=...". Shipping that
+	// verbatim into Loki would hand anyone with Grafana read access a live,
+	// unexpired token for every such request -- structured metadata is
+	// still full-text queryable per-line, same exposure as a label. The
+	// route itself (what the dashboards actually filter/aggregate on, see
+	// nginx-security.json) never depends on the query string, so dropping
+	// it costs nothing there.
+	stage.regex {
+		expression = "^(?P<remote_addr>\\S+) - (?P<remote_user>\\S+) \\[(?P<time_local>[^\\]]+)\\] \"(?P<method>\\S+) (?P<path>[^?\\s]+)(?:\\?\\S*)? (?P<proto>[^\"]+)\" (?P<status>\\d+) (?P<size>\\d+) \"(?P<referer>[^\"]*)\" \"(?P<agent>[^\"]*)\""
+	}
+
+	// status/method are low-cardinality (a few dozen values at most) -- safe
+	// as real Loki labels, letting dashboard panels filter/aggregate on them
+	// cheaply. remote_addr/path are NOT labels (unbounded cardinality --
+	// every distinct client IP would otherwise become its own log stream);
+	// attached as structured metadata instead, so they're still queryable
+	// per-line in Grafana without an unbounded label set.
+	stage.labels {
+		values = {
+			method = null,
+			status = null,
+		}
+	}
+
+	stage.structured_metadata {
+		values = {
+			path        = null,
+			remote_addr = null,
+		}
+	}
+}
+
+loki.write "default" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
+}
